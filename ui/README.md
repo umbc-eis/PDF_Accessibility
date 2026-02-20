@@ -198,7 +198,7 @@ For detailed setup instructions, troubleshooting, and manual update procedures, 
    - Click "Upload PDF" or drag and drop
    - File must meet your quota limits:
      - Maximum file size (default: 25 MB)
-     - Maximum pages (default: 10 pages)
+     - Maximum pages (default: 25 pages)
    - The system validates your file before upload
 
 3. **Monitor Processing**
@@ -237,7 +237,8 @@ Administrators can change user groups through the AWS Cognito console:
 
 - Amazon Cognito User Pool with custom attributes
 - Cognito Identity Pool for S3 access
-- Three user groups (Default, Amazon, Admin)
+- Two user groups (Default, Admin)
+- Email domain restriction (@umbc.edu only)
 - Hosted UI for sign-in/sign-up
 
 **Backend APIs:**

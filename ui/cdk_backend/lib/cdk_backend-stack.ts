@@ -132,7 +132,6 @@ export class CdkBackendStack extends cdk.Stack {
 
     const domainPrefix = `pdf-ui-auth${Math.random().toString(36).substring(2, 8)}`; // must be globally unique in that region
     const Default_Group = 'DefaultUsers';
-    const Amazon_Group = 'AmazonUsers';
     const Admin_Group = 'AdminUsers';
     const appUrl = `https://main.${amplifyApp.appId}.amplifyapp.com`;
 
@@ -210,6 +209,19 @@ export class CdkBackendStack extends cdk.Stack {
     }
     
     // Create the Lambda role first with necessary permissions
+    // =====================================================================
+    // PreSignUp Lambda (Email Domain Validation)
+    // =====================================================================
+    const preSignUpFn = new lambda.Function(this, 'PreSignUpLambda', {
+      runtime: lambda.Runtime.PYTHON_3_12,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/preSignUp/'),
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // =====================================================================
+    // PostConfirmation Lambda (Group Assignment)
+    // =====================================================================
     const postConfirmationLambdaRole = new iam.Role(this, 'PostConfirmationLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
     });
@@ -230,7 +242,6 @@ export class CdkBackendStack extends cdk.Stack {
       role: postConfirmationLambdaRole,
       environment: {
         DEFAULT_GROUP_NAME: Default_Group,
-        AMAZON_GROUP_NAME: Amazon_Group,
         ADMIN_GROUP_NAME: Admin_Group,
       },
     });
@@ -325,6 +336,7 @@ def handler(event, context):
 
     // ------------------- Cognito: User Pool, Domain, Client -------------------
     const userPoolTriggers: any = {
+      preSignUp: preSignUpFn,
       postConfirmation: postConfirmationFn,
     };
 
@@ -394,14 +406,6 @@ def handler(event, context):
         userPoolId: userPool.userPoolId,
         description: 'Group for default or normal users',
         precedence: 1, // Determines the priority of the group
-      });
-
-      // Amazon Users Group
-      const amazonUsersGroup = new cognito.CfnUserPoolGroup(this, 'AmazonUsersGroup', {
-        groupName: Amazon_Group,
-        userPoolId: userPool.userPoolId,
-        description: 'Group for Amazon Employees',
-        precedence: 2,
       });
 
       // Admin Users Group

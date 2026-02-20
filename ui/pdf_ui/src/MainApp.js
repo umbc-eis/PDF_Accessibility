@@ -34,8 +34,8 @@ function MainApp({ isLoggingOut, setIsLoggingOut }) {
   const [usageCount, setUsageCount] = useState(0);
   const [pdf2pdfCount, setPdf2pdfCount] = useState(0);
   const [pdf2htmlCount, setPdf2htmlCount] = useState(0);
-  const [maxFilesAllowed, setMaxFilesAllowed] = useState(3); // Default value
-  const [maxPagesAllowed, setMaxPagesAllowed] = useState(10); // Default value
+  const [maxFilesAllowed, setMaxFilesAllowed] = useState(25); // Default value
+  const [maxPagesAllowed, setMaxPagesAllowed] = useState(25); // Default value
   const [maxSizeAllowedMB, setMaxSizeAllowedMB] = useState(25); // Default value
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [usageError, setUsageError] = useState('');

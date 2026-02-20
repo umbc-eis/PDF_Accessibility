@@ -27,22 +27,22 @@ When the [PDF Accessibility UI](https://github.com/ASUCICREPO/PDF_accessability_
 
 | Attribute | Description | Default (DefaultUsers) |
 |---|---|---|
-| `custom:max_files_allowed` | Maximum number of files a user can upload | `8` |
-| `custom:max_pages_allowed` | Maximum number of pages per PDF | `10` |
+| `custom:max_files_allowed` | Maximum number of files a user can upload | `25` |
+| `custom:max_pages_allowed` | Maximum number of pages per PDF | `25` |
 | `custom:max_size_allowed_MB` | Maximum file size in MB | `25` |
 | `custom:total_files_uploaded` | Current upload count (tracked automatically) | `0` |
 
 ### Default Limits by User Group
 
-The UI creates three Cognito user groups, each with different default limits:
+The UI creates two Cognito user groups, each with different default limits:
 
-| Attribute | DefaultUsers | AmazonUsers | AdminUsers |
-|---|---|---|---|
-| `max_files_allowed` | 8 | 15 | 100 |
-| `max_pages_allowed` | 10 | 10 | 2500 |
-| `max_size_allowed_MB` | 25 | 25 | 1000 |
+| Attribute | DefaultUsers | AdminUsers |
+|---|---|---|
+| `max_files_allowed` | 25 | 100 |
+| `max_pages_allowed` | 25 | 2500 |
+| `max_size_allowed_MB` | 25 | 1000 |
 
-These defaults are set when a user first signs up and is automatically assigned to a group. Users with an `@amazon.com` email are assigned to **AmazonUsers**; all others go to **DefaultUsers**. Administrators can move users to **AdminUsers** manually through the Cognito console.
+These defaults are set when a user first signs up and is automatically assigned to a group. Only users with `@umbc.edu` email addresses can register. Specific admin users (`champ@umbc.edu` and `paluck@umbc.edu`) are automatically assigned to **AdminUsers**; all others go to **DefaultUsers**.
 
 ---
 
@@ -82,15 +82,8 @@ group_attributes = {
     DEFAULT_GROUP: {
         'custom:first_sign_in': 'true',
         'custom:total_files_uploaded': '0',
-        'custom:max_files_allowed': '8',       # Change this value
-        'custom:max_pages_allowed': '10',       # Change this value
-        'custom:max_size_allowed_MB': '25'      # Change this value
-    },
-    AMAZON_GROUP: {
-        'custom:first_sign_in': 'true',
-        'custom:total_files_uploaded': '0',
-        'custom:max_files_allowed': '15',       # Change this value
-        'custom:max_pages_allowed': '10',       # Change this value
+        'custom:max_files_allowed': '25',       # Change this value
+        'custom:max_pages_allowed': '25',       # Change this value
         'custom:max_size_allowed_MB': '25'      # Change this value
     },
     ADMIN_GROUP: {
@@ -112,18 +105,13 @@ This Lambda runs when a user is moved between groups (via EventBridge) and appli
 ```python
 GROUP_LIMITS = {
     'DefaultUsers': {
-        'custom:max_files_allowed': '3',        # Change this value
-        'custom:max_pages_allowed': '10',       # Change this value
-        'custom:max_size_allowed_MB': '25'      # Change this value
-    },
-    'AmazonUsers': {
-        'custom:max_files_allowed': '5',        # Change this value
-        'custom:max_pages_allowed': '10',       # Change this value
+        'custom:max_files_allowed': '25',       # Change this value
+        'custom:max_pages_allowed': '25',       # Change this value
         'custom:max_size_allowed_MB': '25'      # Change this value
     },
     'AdminUsers': {
-        'custom:max_files_allowed': '500',      # Change this value
-        'custom:max_pages_allowed': '1500',     # Change this value
+        'custom:max_files_allowed': '100',      # Change this value
+        'custom:max_pages_allowed': '2500',     # Change this value
         'custom:max_size_allowed_MB': '1000'    # Change this value
     }
 }

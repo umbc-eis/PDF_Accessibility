@@ -162,8 +162,8 @@ def handler(event, context):
         # 2) Parse the current attributes
         user_attributes = {attr["Name"]: attr["Value"] for attr in response.get("UserAttributes", [])}
         current_count_str = user_attributes.get("custom:total_files_uploaded", "0")
-        max_files_allowed_str = user_attributes.get("custom:max_files_allowed", "3")
-        max_pages_allowed_str = user_attributes.get("custom:max_pages_allowed", "10")
+        max_files_allowed_str = user_attributes.get("custom:max_files_allowed", "25")
+        max_pages_allowed_str = user_attributes.get("custom:max_pages_allowed", "25")
         max_size_allowed_mb_str = user_attributes.get("custom:max_size_allowed_MB", "25")
         pdf2pdf_count_str = user_attributes.get("custom:pdf2pdf", "0")
         pdf2html_count_str = user_attributes.get("custom:pdf2html", "0")
@@ -176,12 +176,12 @@ def handler(event, context):
         try:
             max_files_allowed = int(max_files_allowed_str)
         except ValueError:
-            max_files_allowed = 3  # Default value
+            max_files_allowed = 25  # Default value
 
         try:
             max_pages_allowed = int(max_pages_allowed_str)
         except ValueError:
-            max_pages_allowed = 10  # Default value
+            max_pages_allowed = 25  # Default value
 
         try:
             max_size_allowed_mb = int(max_size_allowed_mb_str)

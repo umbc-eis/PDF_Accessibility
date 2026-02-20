@@ -7,10 +7,9 @@ def handler(event, context):
     if event['triggerSource'] != 'PostConfirmation_ConfirmSignUp':
         print(f"Skipping initialization - trigger source is {event['triggerSource']}")
         return event
-    
+
     # Retrieve group names from environment variables
     DEFAULT_GROUP = str(os.environ.get('DEFAULT_GROUP_NAME'))
-    AMAZON_GROUP = str(os.environ.get('AMAZON_GROUP_NAME'))
     ADMIN_GROUP = str(os.environ.get('ADMIN_GROUP_NAME'))
 
     # Define attribute defaults based on group
@@ -18,15 +17,8 @@ def handler(event, context):
         DEFAULT_GROUP: {
             'custom:first_sign_in': 'true',
             'custom:total_files_uploaded': '0',
-            'custom:max_files_allowed': '8',
-            'custom:max_pages_allowed': '10',
-            'custom:max_size_allowed_MB': '25'
-        },
-        AMAZON_GROUP: {
-            'custom:first_sign_in': 'true',
-            'custom:total_files_uploaded': '0',
-            'custom:max_files_allowed': '15',
-            'custom:max_pages_allowed': '10',
+            'custom:max_files_allowed': '25',
+            'custom:max_pages_allowed': '25',
             'custom:max_size_allowed_MB': '25'
         },
         ADMIN_GROUP: {
@@ -43,18 +35,20 @@ def handler(event, context):
         user_pool_id = event['userPoolId']
         username = event['userName']
 
-        # Determine the group to assign the user to
-        # For demonstration, we'll assign all users to the Default group
-        # You can implement your own logic here to assign to Amazon or Admin groups
-        assigned_group = DEFAULT_GROUP
+        # Get user email
+        user_email = event['request']['userAttributes'].get('email', '').lower()
 
-        # Example logic to assign to AmazonUsers based on email domain
-        user_email = event['request']['userAttributes'].get('email', '')
-        if user_email.endswith('@amazon.com'):
-            assigned_group = AMAZON_GROUP
-        # Example logic to assign to AdminUsers based on a specific condition
-        # elif user_email.endswith('@admin.com'):
-        #     assigned_group = ADMIN_GROUP
+        # Validate email domain - only allow @umbc.edu
+        if not user_email.endswith('@umbc.edu'):
+            print(f'Rejected user with non-UMBC email: {user_email}')
+            raise Exception('Only @umbc.edu email addresses are allowed to register.')
+
+        # Determine the group to assign the user to
+        # Assign specific users to AdminUsers group
+        if user_email in ['champ@umbc.edu', 'paluck@umbc.edu']:
+            assigned_group = ADMIN_GROUP
+        else:
+            assigned_group = DEFAULT_GROUP
 
         # Add user to the assigned group
         cognito_idp.admin_add_user_to_group(

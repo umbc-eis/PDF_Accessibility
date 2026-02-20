@@ -1,9 +1,9 @@
-// Colors for your theme
-export const PRIMARY_MAIN = '#1976d2';  // Your primary color (blue)
-export const SECONDARY_MAIN = '#ff4081';  // Your secondary color (pink)
-export const CHAT_LEFT_PANEL_BACKGROUND = '#2c3e50';  // Background color for left panel
-export const HEADER_BACKGROUND = '#34495e';  // Background color for header
-export const primary_50 = '#e3f2fd';  // Lighter shade of primary color
+// UMBC Colors for theme
+export const PRIMARY_MAIN = '#000000';  // UMBC Black
+export const SECONDARY_MAIN = '#fdb515';  // UMBC Gold
+export const CHAT_LEFT_PANEL_BACKGROUND = '#000000';  // Background color for left panel
+export const HEADER_BACKGROUND = '#000000';  // Background color for header
+export const primary_50 = '#f5f5f5';  // Lighter shade for backgrounds
 
 export const isMaintenanceMode = process.env.REACT_APP_MAINTENANCE_MODE === 'true';
 

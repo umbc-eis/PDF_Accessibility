@@ -91,10 +91,10 @@ const LeftNav = ({ isCollapsed, setIsCollapsed, mobileOpen, setMobileOpen }) => 
             </Box>
             <Divider sx={{ marginBottom: 2 }} />
             <Typography variant="body2" gutterBottom>
-              - Each user is limited to <strong>8 PDF document uploads</strong>.
+              - Each user is limited to <strong>25 PDF document uploads</strong>.
             </Typography>
             <Typography variant="body2" gutterBottom>
-              - Documents cannot exceed <strong>10 pages</strong>.
+              - Documents cannot exceed <strong>25 pages</strong>.
             </Typography>
             <Typography variant="body2" gutterBottom>
               - Documents must be smaller than <strong>25 MB</strong>.
