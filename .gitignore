@@ -16,12 +16,26 @@ __pycache__/
 *.pyc
 javascript_docker/node_modules
 lambda/add_title/venv
-PDF_accessability_UI
+
 # IDE and editor files
 **/.vscode/
+
 # OS generated files
 **/.DS_Store
 **/.DS_Store?
 
-# PDF UI (separate repo)
-PDF_accessability_UI/
+# UI - Security sensitive files
+ui/cdk_backend/allowed-ips.txt
+
+# UI - Build artifacts
+ui/cdk_backend/cdk.out/
+ui/cdk_backend/.cdk.staging/
+ui/cdk_backend/cdk.context.json
+ui/cdk_backend/node_modules/
+ui/pdf_ui/node_modules/
+ui/pdf_ui/build/
+
+# UI - Environment files
+ui/.env
+ui/.env.local
+ui/**/*.env

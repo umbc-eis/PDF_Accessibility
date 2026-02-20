@@ -40,6 +40,8 @@ All work produced is open source. More information can be found in the GitHub re
 | [Uninstalling](#uninstalling)                                                       | How to safely remove all deployed resources             |
 | [PDF-to-PDF Remediation Solution](#pdf-to-pdf-remediation-solution)                 | PDF format preservation solution details                |
 | [PDF-to-HTML Remediation Solution](#pdf-to-html-remediation-solution)               | HTML conversion solution details                        |
+| [IP-Based Access Control](docs/IP_ACCESS_CONTROL.md)                               | How to restrict access by IP address or CIDR range      |
+| [UI IP Restrictions](docs/UI_IP_RESTRICTIONS.md)                                   | Quick guide to UI-specific IP restrictions (implemented)|
 | [Configuring Limits](docs/CONFIGURING_LIMITS.md)                                   | How to modify document limits, quotas, and defaults     |
 | [Monitoring](#monitoring)                                                           | System monitoring and observability                     |
 | [Troubleshooting](#troubleshooting)                                                 | Common issues and solutions                             |
@@ -204,6 +206,51 @@ The uninstall script will:
 
 For detailed uninstall instructions and troubleshooting, see [UNINSTALL.md](UNINSTALL.md).
 
+## Security & Access Control
+
+### IP-Based Access Restrictions
+
+By default, the UI and API are publicly accessible (with Cognito authentication required). For enhanced security, you can restrict access to specific IP addresses or CIDR ranges.
+
+**Quick Options:**
+
+1. **API Gateway Resource Policy** (Free, Simple)
+   - Restricts backend API calls to specific IPs
+   - Users outside the IP range get 403 Forbidden
+
+2. **AWS WAF** (~$6/month, Advanced)
+   - Full DDoS protection
+   - Rate limiting
+   - Advanced logging and metrics
+
+3. **Cognito Pre-Auth Lambda** (Free, Simple)
+   - Blocks login from unauthorized IPs
+   - Clear error messages for users
+
+**See the complete guide:** [IP-Based Access Control Documentation](docs/IP_ACCESS_CONTROL.md)
+
+**Quick Start Example:**
+```typescript
+// Add to your API Gateway in cdk_backend-stack.ts
+policy: new iam.PolicyDocument({
+  statements: [
+    new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      principals: [new iam.AnyPrincipal()],
+      actions: ['execute-api:Invoke'],
+      resources: ['execute-api:/*'],
+      conditions: {
+        IpAddress: {
+          'aws:SourceIp': ['YOUR_IP_RANGE/24']
+        }
+      }
+    })
+  ]
+})
+```
+
+For implementation examples and detailed instructions, see [docs/examples/ip-restriction-example.ts](docs/examples/ip-restriction-example.ts).
+
 ## PDF-to-PDF Remediation Solution
 
 ### Overview
@@ -295,6 +342,26 @@ This solution converts PDF documents to accessible HTML format while preserving 
 ## Contributing
 
 Contributions to this project are welcome. Please fork the repository and submit a pull request with your changes.
+
+## Repository Structure
+
+This repository contains both backend processing and frontend UI components:
+
+```
+PDF_Accessibility/
+├── adobe-autotag-container/    # PDF auto-tagging service
+├── alt-text-generator-container/  # AI-powered alt text generation
+├── lambda/                      # Lambda functions for processing
+├── pdf2html/                    # PDF to HTML conversion
+├── ui/                          # Frontend UI (React + Amplify)
+│   ├── cdk_backend/             # UI infrastructure (CDK)
+│   ├── pdf_ui/                  # React application
+│   └── deploy.sh                # UI-specific deployment script
+├── docs/                        # Documentation
+├── deploy.sh                    # Master deployment script
+├── uninstall.sh                 # Uninstall script
+└── README.md                    # This file
+```
 
 ## Acknowledgments
 

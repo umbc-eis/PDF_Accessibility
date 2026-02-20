@@ -628,6 +628,277 @@ EOF
     print_success "✅ $solution_name deployment summary complete!"
 }
 
+# Function to configure custom domain for Amplify
+configure_custom_domain() {
+    local stack_name="${PROJECT_NAME}-AmplifyHostingStack"
+
+    echo ""
+    print_header "🌐 Custom Domain Configuration"
+    print_header "=============================="
+    echo ""
+
+    # Prompt user
+    read -p "Would you like to configure a custom domain? (y/n): " CONFIGURE_DOMAIN
+
+    if [[ ! "$CONFIGURE_DOMAIN" =~ ^[Yy]$ ]]; then
+        print_status "Skipping custom domain configuration."
+        return 0
+    fi
+
+    echo ""
+    print_status "📋 Getting Amplify App information..."
+
+    # Get Amplify App ID from CloudFormation
+    AMPLIFY_APP_ID=$(aws cloudformation describe-stacks \
+        --stack-name "$stack_name" \
+        --query 'Stacks[0].Outputs[?OutputKey==`AmplifyAppId`].OutputValue' \
+        --output text 2>/dev/null)
+
+    if [ -z "$AMPLIFY_APP_ID" ] || [ "$AMPLIFY_APP_ID" == "None" ]; then
+        print_error "Could not retrieve Amplify App ID. Please configure manually."
+        print_status "See: docs/CUSTOM_DOMAIN_SETUP.md"
+        return 1
+    fi
+
+    print_success "Found Amplify App ID: $AMPLIFY_APP_ID"
+
+    # Prompt for domain information
+    echo ""
+    print_status "📝 Domain Configuration"
+    echo ""
+    echo "Examples:"
+    echo "  - Root domain: yourdomain.com (leave subdomain blank)"
+    echo "  - Subdomain:   pdf.yourdomain.com (enter 'pdf' as subdomain)"
+    echo ""
+
+    read -p "Enter your root domain (e.g., yourdomain.com): " ROOT_DOMAIN
+
+    if [ -z "$ROOT_DOMAIN" ]; then
+        print_error "Domain name is required."
+        return 1
+    fi
+
+    read -p "Enter subdomain prefix (leave blank for root, or enter 'pdf', 'www', etc.): " SUBDOMAIN_PREFIX
+
+    if [ -z "$SUBDOMAIN_PREFIX" ]; then
+        FULL_DOMAIN="$ROOT_DOMAIN"
+        SUBDOMAIN_PREFIX="@"  # Root domain indicator
+    else
+        FULL_DOMAIN="${SUBDOMAIN_PREFIX}.${ROOT_DOMAIN}"
+    fi
+
+    echo ""
+    print_status "Will configure: $FULL_DOMAIN"
+    read -p "Continue? (y/n): " CONFIRM
+
+    if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+        print_status "Cancelled."
+        return 0
+    fi
+
+    # Create domain association
+    echo ""
+    print_status "🔗 Creating domain association..."
+
+    if [ "$SUBDOMAIN_PREFIX" == "@" ]; then
+        # Root domain
+        SUBDOMAIN_JSON='[{"prefix": "", "branchName": "main"}]'
+    else
+        # Subdomain
+        SUBDOMAIN_JSON="[{\"prefix\": \"$SUBDOMAIN_PREFIX\", \"branchName\": \"main\"}]"
+    fi
+
+    CREATE_OUTPUT=$(aws amplify create-domain-association \
+        --app-id "$AMPLIFY_APP_ID" \
+        --domain-name "$ROOT_DOMAIN" \
+        --sub-domain-settings "$SUBDOMAIN_JSON" \
+        --region us-east-1 2>&1)
+
+    if [ $? -eq 0 ]; then
+        print_success "✅ Domain association created!"
+    else
+        # Check if domain already exists
+        if echo "$CREATE_OUTPUT" | grep -q "DomainAssociationAlreadyExistsException"; then
+            print_warning "⚠️ Domain association already exists. Fetching current status..."
+        else
+            print_error "Failed to create domain association:"
+            echo "$CREATE_OUTPUT"
+            return 1
+        fi
+    fi
+
+    # Get domain association details
+    echo ""
+    print_status "📋 Fetching DNS configuration..."
+    sleep 2
+
+    DOMAIN_INFO=$(aws amplify get-domain-association \
+        --app-id "$AMPLIFY_APP_ID" \
+        --domain-name "$ROOT_DOMAIN" \
+        --region us-east-1 2>/dev/null)
+
+    if [ $? -ne 0 ]; then
+        print_error "Could not retrieve domain information."
+        return 1
+    fi
+
+    # Extract DNS records
+    DOMAIN_STATUS=$(echo "$DOMAIN_INFO" | jq -r '.domainAssociation.domainStatus')
+
+    echo ""
+    print_header "📌 Required DNS Configuration"
+    print_header "=============================="
+    echo ""
+    print_status "Status: $DOMAIN_STATUS"
+    echo ""
+    print_warning "⚠️ You MUST add the following DNS records to your domain provider:"
+    echo ""
+
+    # Parse and display subdomain CNAME records
+    echo "$DOMAIN_INFO" | jq -r '.domainAssociation.subDomains[] | "  \(.subDomainSetting.prefix // "@ (root)") → CNAME → \(.dnsRecord)"' | while read line; do
+        echo "  $line"
+    done
+
+    # Display certificate verification record if present
+    CERT_RECORD=$(echo "$DOMAIN_INFO" | jq -r '.domainAssociation.certificateVerificationDNSRecord // empty')
+    if [ -n "$CERT_RECORD" ]; then
+        echo ""
+        print_warning "Certificate verification (if not using ACM):"
+        echo "  $CERT_RECORD"
+    fi
+
+    echo ""
+    print_status "💡 Steps to complete:"
+    echo "  1. Log in to your DNS provider (Route53, Cloudflare, GoDaddy, etc.)"
+    echo "  2. Add the CNAME record(s) shown above"
+    echo "  3. Wait for DNS propagation (5-30 minutes)"
+    echo "  4. Check status using the command below"
+    echo ""
+
+    # Offer to wait and check status
+    read -p "Would you like to wait and check the domain status? (y/n): " CHECK_STATUS
+
+    if [[ "$CHECK_STATUS" =~ ^[Yy]$ ]]; then
+        echo ""
+        print_status "🔍 Checking domain status..."
+        print_status "This will poll every 30 seconds for up to 15 minutes."
+        print_status "You can press Ctrl+C to stop checking."
+        echo ""
+
+        MAX_ATTEMPTS=30  # 15 minutes (30 * 30 seconds)
+        ATTEMPT=0
+
+        while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            CURRENT_STATUS=$(aws amplify get-domain-association \
+                --app-id "$AMPLIFY_APP_ID" \
+                --domain-name "$ROOT_DOMAIN" \
+                --query 'domainAssociation.domainStatus' \
+                --output text \
+                --region us-east-1 2>/dev/null)
+
+            echo -ne "\r  Status: $CURRENT_STATUS (Check $((ATTEMPT + 1))/$MAX_ATTEMPTS)"
+
+            if [ "$CURRENT_STATUS" == "AVAILABLE" ]; then
+                echo ""
+                print_success "✅ Domain is now AVAILABLE!"
+                break
+            elif [ "$CURRENT_STATUS" == "FAILED" ]; then
+                echo ""
+                print_error "❌ Domain verification failed. Check DNS records."
+                break
+            fi
+
+            sleep 30
+            ATTEMPT=$((ATTEMPT + 1))
+        done
+
+        if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+            echo ""
+            print_warning "⏱️ Timeout reached. DNS propagation may still be in progress."
+        fi
+    fi
+
+    echo ""
+    print_status "📝 To check status later, run:"
+    echo "  aws amplify get-domain-association --app-id $AMPLIFY_APP_ID --domain-name $ROOT_DOMAIN --region us-east-1"
+
+    # Offer to update Cognito callback URLs
+    echo ""
+    read -p "Would you like to update Cognito callback URLs now? (y/n): " UPDATE_COGNITO
+
+    if [[ "$UPDATE_COGNITO" =~ ^[Yy]$ ]]; then
+        echo ""
+        print_status "🔐 Updating Cognito User Pool..."
+
+        # Get User Pool ID
+        USER_POOL_ID=$(aws cognito-idp list-user-pools --max-results 10 \
+            --query "UserPools[?contains(Name, 'PDFAccessibility') || contains(Name, 'pdf-ui')].Id" \
+            --output text 2>/dev/null | head -1)
+
+        if [ -z "$USER_POOL_ID" ] || [ "$USER_POOL_ID" == "None" ]; then
+            print_error "Could not find Cognito User Pool. Update manually later."
+            print_status "See: docs/CUSTOM_DOMAIN_SETUP.md"
+            return 1
+        fi
+
+        print_success "Found User Pool: $USER_POOL_ID"
+
+        # Get User Pool Client ID
+        CLIENT_ID=$(aws cognito-idp list-user-pool-clients --user-pool-id "$USER_POOL_ID" \
+            --max-results 10 \
+            --query 'UserPoolClients[0].ClientId' \
+            --output text 2>/dev/null)
+
+        if [ -z "$CLIENT_ID" ] || [ "$CLIENT_ID" == "None" ]; then
+            print_error "Could not find User Pool Client. Update manually later."
+            return 1
+        fi
+
+        # Get current callback URLs
+        CURRENT_CALLBACKS=$(aws cognito-idp describe-user-pool-client \
+            --user-pool-id "$USER_POOL_ID" \
+            --client-id "$CLIENT_ID" \
+            --query 'UserPoolClient.CallbackURLs' \
+            --output json 2>/dev/null)
+
+        # Add new custom domain URL
+        NEW_CALLBACK="https://${FULL_DOMAIN}/"
+
+        # Merge with existing (remove duplicates)
+        UPDATED_CALLBACKS=$(echo "$CURRENT_CALLBACKS" | jq --arg url "$NEW_CALLBACK" '. + [$url] | unique')
+
+        print_status "Adding callback URL: $NEW_CALLBACK"
+
+        # Update User Pool Client
+        aws cognito-idp update-user-pool-client \
+            --user-pool-id "$USER_POOL_ID" \
+            --client-id "$CLIENT_ID" \
+            --callback-urls "$UPDATED_CALLBACKS" \
+            --allowed-o-auth-flows "code" \
+            --allowed-o-auth-scopes "email" "openid" "profile" \
+            --allowed-o-auth-flows-user-pool-client \
+            --supported-identity-providers "COGNITO" \
+            >/dev/null 2>&1
+
+        if [ $? -eq 0 ]; then
+            print_success "✅ Cognito callback URLs updated!"
+        else
+            print_error "Failed to update Cognito. Update manually later."
+            print_status "See: docs/CUSTOM_DOMAIN_SETUP.md"
+        fi
+    else
+        echo ""
+        print_status "⏭️  Skipping Cognito update. You can update manually later."
+        print_status "See: docs/CUSTOM_DOMAIN_SETUP.md"
+    fi
+
+    echo ""
+    print_success "🎉 Custom domain configuration complete!"
+    print_status "Once DNS propagates, your app will be available at: https://$FULL_DOMAIN"
+
+    return 0
+}
+
 # Function to deploy UI
 deploy_ui() {
     print_header "🎨 Deploying Frontend UI..."
@@ -664,35 +935,102 @@ deploy_ui() {
     
     # Store current directory
     ORIGINAL_DIR=$(pwd)
-    
-    # Clone UI repository to temporary location
-    UI_TEMP_DIR="/tmp/pdf-ui-deployment-$$"
-    print_status "📥 Cloning UI repository..."
-    
-    if ! git clone -b main https://github.com/ASUCICREPO/PDF_accessability_UI "$UI_TEMP_DIR" 2>/dev/null; then
-        print_error "Failed to clone UI repository. Check internet connection and repository access."
+
+    # Use local UI directory (integrated into main repo)
+    UI_DIR="$ORIGINAL_DIR/ui"
+    print_status "📂 Using local UI directory..."
+
+    if [ ! -d "$UI_DIR" ]; then
+        print_error "UI directory not found at: $UI_DIR"
+        print_error "Please ensure the UI code is present in the ui/ subdirectory."
         return 1
     fi
-    
-    cd "$UI_TEMP_DIR" || {
+
+    cd "$UI_DIR" || {
         print_error "Failed to change to UI directory"
         return 1
     }
     
+    # =====================================================================
+    # IP-Based Access Control Configuration (Optional)
+    # =====================================================================
+    echo ""
+    print_header "🔒 IP-Based Access Control (Optional)"
+    echo ""
+    print_status "Would you like to restrict UI access to specific IP addresses?"
+    print_status "This is useful for VPN-only access or internal networks."
+    echo ""
+
+    while true; do
+        read -p "Configure IP restrictions? (y/n): " CONFIGURE_IP_RESTRICTIONS
+        case $CONFIGURE_IP_RESTRICTIONS in
+            [Yy]*)
+                echo ""
+                print_status "🔧 Configuring IP restrictions..."
+                print_status "You'll be able to add multiple CIDR ranges."
+                print_status "Example formats:"
+                print_status "   10.0.0.0/16         (VPN range)"
+                print_status "   192.168.1.0/24      (Office network)"
+                print_status "   203.0.113.50/32     (Single IP)"
+                echo ""
+
+                # Create allowed-ips.txt file
+                IP_CONFIG_FILE="$UI_DIR/cdk_backend/allowed-ips.txt"
+                echo "# IP Access Control Configuration" > "$IP_CONFIG_FILE"
+                echo "# Generated during deployment: $(date)" >> "$IP_CONFIG_FILE"
+                echo "" >> "$IP_CONFIG_FILE"
+
+                IP_COUNT=0
+                while true; do
+                    echo ""
+                    read -p "Enter CIDR range (or press Enter to finish): " IP_RANGE
+
+                    if [ -z "$IP_RANGE" ]; then
+                        if [ $IP_COUNT -eq 0 ]; then
+                            print_warning "No IP ranges entered. Skipping IP restrictions."
+                            rm -f "$IP_CONFIG_FILE"
+                        else
+                            print_success "✅ Added $IP_COUNT IP range(s)"
+                        fi
+                        break
+                    fi
+
+                    # Basic CIDR validation
+                    if echo "$IP_RANGE" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]{1,2})?$'; then
+                        echo "$IP_RANGE" >> "$IP_CONFIG_FILE"
+                        IP_COUNT=$((IP_COUNT + 1))
+                        print_success "   ✅ Added: $IP_RANGE"
+                    else
+                        print_error "   ❌ Invalid CIDR format. Please use format like: 10.0.0.0/16"
+                    fi
+                done
+                break
+                ;;
+            [Nn]*)
+                print_status "Skipping IP restrictions (UI will be publicly accessible with authentication)."
+                break
+                ;;
+            *)
+                print_error "Please answer yes (y) or no (n)."
+                ;;
+        esac
+    done
+    echo ""
+    # =====================================================================
+
     # Set environment variables for UI deployment
     export PROJECT_NAME="${PROJECT_NAME}-ui"
     export PDF_TO_PDF_BUCKET="$pdf_to_pdf_bucket"
     export PDF_TO_HTML_BUCKET="$pdf_to_html_bucket"
     export TARGET_BRANCH="main"
-    
+
     print_status "🚀 Starting UI deployment..."
     print_status "   This may take 10-15 minutes..."
     
     # Verify UI deployment script exists
     if [ ! -f "deploy.sh" ]; then
-        print_error "UI deployment script not found in repository"
+        print_error "UI deployment script not found in ui/ directory"
         cd "$ORIGINAL_DIR"
-        rm -rf "$UI_TEMP_DIR"
         return 1
     fi
     
@@ -702,29 +1040,30 @@ deploy_ui() {
     # Run UI deployment script with error handling
     if ./deploy.sh; then
         print_success "✅ UI deployment completed successfully!"
-        
+
         # Extract Amplify URL from the deployment
         AMPLIFY_URL=$(aws cloudformation describe-stacks \
             --stack-name "${PROJECT_NAME}-AmplifyHostingStack" \
             --query 'Stacks[0].Outputs[?OutputKey==`AmplifyWebsiteUrl`].OutputValue' \
             --output text 2>/dev/null)
-        
+
         if [ -n "$AMPLIFY_URL" ] && [ "$AMPLIFY_URL" != "None" ]; then
             print_success "🌐 Frontend URL: $AMPLIFY_URL"
         else
             print_warning "⚠️ Could not retrieve Amplify URL. Check CloudFormation console."
         fi
+
+        # Return to original directory before custom domain config
+        cd "$ORIGINAL_DIR"
+
+        # Offer custom domain configuration
+        configure_custom_domain
     else
         print_error "❌ UI deployment failed. Check the logs above for details."
         cd "$ORIGINAL_DIR"
-        rm -rf "$UI_TEMP_DIR"
         return 1
     fi
-    
-    # Cleanup
-    cd "$ORIGINAL_DIR"
-    rm -rf "$UI_TEMP_DIR"
-    
+
     echo ""
     return 0
 }

@@ -1,0 +1,30 @@
+# Security - DO NOT commit IP whitelist
+cdk_backend/allowed-ips.txt
+
+# CDK
+cdk_backend/cdk.out/
+cdk_backend/.cdk.staging/
+cdk_backend/cdk.context.json
+
+# Dependencies
+node_modules/
+cdk_backend/node_modules/
+
+# Environment
+.env
+.env.local
+*.env
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

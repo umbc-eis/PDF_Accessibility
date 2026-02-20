@@ -1,0 +1,42 @@
+digraph INFRA {
+  node [ color = "black", fillcolor = "#E6E6E6", height =1, style = "filled,bold,rounded", fontname = "Arial" ];
+  "PDF-Accessability-User-Pool" [ label = "PDF-Accessability-User-Pool
+(AWS::Cognito::UserPool)", shape =rectangle ];
+  "PDF-Accessability-User-Pool-Client" [ label = "PDF-Accessability-User-Pool-Client
+(AWS::Cognito::UserPoolClient)", shape =rectangle ];
+  "PDF-Accessability-User-Pool-Domain" [ label = "PDF-Accessability-User-Pool-Domain
+(AWS::Cognito::UserPoolDomain)", shape =rectangle ];
+  "PDFIdentityPool" [ label = "PDFIdentityPool
+(AWS::Cognito::IdentityPool)", shape =rectangle ];
+  "CognitoDefaultAuthenticatedRole" [ label = "CognitoDefaultAuthenticatedRole
+(AWS::IAM::Role)", shape =rectangle ];
+  "ImportedBucket" [ label = "ImportedBucket
+(AWS::S3::Bucket)", shape =cylinder, fillcolor = "#FFF5CD" ];
+  "GitHubToken" [ label = "GitHubToken
+(AWS::SecretsManager::Secret)", shape =rectangle ];
+  "pdfui" [ label = "pdfui
+(AWS::Amplify::App)", shape =rectangle, fillcolor = "#B7E0FF" ];
+  "PostConfirmationLambda" [ label = "PostConfirmationLambda
+(AWS::Lambda::Function)", shape =rectangle, fillcolor = "#B7E0FF" ];
+  "UpdateAttributesFn" [ label = "UpdateAttributesFn
+(AWS::Lambda::Function)", shape =rectangle, fillcolor = "#B7E0FF" ];
+  "Default_Group" [ label = "Default_Group
+(AWS::Cognito::UserPoolGroup)", shape =rectangle ];
+  "AmazonUsersGroup" [ label = "AmazonUsersGroup
+(AWS::Cognito::UserPoolGroup)", shape =rectangle ];
+  "AdminUsersGroup" [ label = "AdminUsersGroup
+(AWS::Cognito::UserPoolGroup)", shape =rectangle ];
+  "MyManagedLoginBranding" [ label = "MyManagedLoginBranding
+(AWS::Cognito::UserPoolManagedLoginBranding)", shape =rectangle ];
+  "PDF-Accessability-User-Pool-Client" -> "PDF-Accessability-User-Pool";
+  "PDF-Accessability-User-Pool-Domain" -> "PDF-Accessability-User-Pool";
+  "PDFIdentityPool" -> "PDF-Accessability-User-Pool";
+  "PDFIdentityPool" -> "PDF-Accessability-User-Pool-Client";
+  "CognitoDefaultAuthenticatedRole" -> "PDFIdentityPool";
+  "pdfui" -> "GitHubToken";
+  "Default_Group" -> "PDF-Accessability-User-Pool";
+  "AmazonUsersGroup" -> "PDF-Accessability-User-Pool";
+  "AdminUsersGroup" -> "PDF-Accessability-User-Pool";
+  "MyManagedLoginBranding" -> "PDF-Accessability-User-Pool";
+  "MyManagedLoginBranding" -> "PDF-Accessability-User-Pool-Client";
+}

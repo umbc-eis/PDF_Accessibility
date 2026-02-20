@@ -1,0 +1,32 @@
+# Allowed IP Addresses and CIDR Ranges
+#
+# Format: One IP or CIDR range per line
+# Lines starting with # are comments and will be ignored
+# Empty lines are ignored
+#
+# Examples:
+# 10.0.0.0/16          - Allows entire 10.0.x.x range (65,536 IPs)
+# 192.168.1.0/24       - Allows 192.168.1.0 - 192.168.1.255 (256 IPs)
+# 203.0.113.50/32      - Allows single IP address
+#
+# IMPORTANT: If this file doesn't exist or is empty, NO IP restrictions
+# will be applied (current behavior - publicly accessible with auth)
+#
+# To enable IP restrictions:
+# 1. Copy this file to: allowed-ips.txt
+# 2. Add your VPN/office CIDR ranges below
+# 3. Deploy: npx cdk deploy
+#
+# Example configuration:
+
+# Main VPN range
+# 10.0.0.0/16
+
+# Backup VPN
+# 10.1.0.0/16
+
+# Office network
+# 192.168.1.0/24
+
+# Specific admin IP
+# 203.0.113.50/32
