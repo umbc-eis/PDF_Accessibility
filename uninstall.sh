@@ -10,6 +10,11 @@
 # 3. Frontend UI (Amplify + Cognito resources)
 #
 # IMPORTANT: This will permanently delete all resources and data!
+#
+# Privacy Note: AWS CLI output is suppressed to avoid exposing:
+# - Document/file names stored in S3 buckets
+# - Full ARNs (only showing resource IDs where appropriate)
+# - AWS Account IDs are still visible in some outputs
 # ========================================================================
 
 set -e
@@ -266,27 +271,46 @@ delete_bucket() {
         return 0
     fi
 
-    # Empty bucket
+    # Empty bucket (suppress output to avoid exposing filenames)
     print_status "   Emptying bucket..."
-    if aws s3 rm "s3://$bucket_name" --recursive 2>/dev/null; then
-        print_status "   Bucket emptied"
+    OBJECT_COUNT=$(aws s3 ls "s3://$bucket_name" --recursive 2>/dev/null | wc -l || echo "0")
+    if [ "$OBJECT_COUNT" -gt 0 ]; then
+        print_status "   Deleting $OBJECT_COUNT object(s)..."
+        if aws s3 rm "s3://$bucket_name" --recursive --quiet 2>/dev/null; then
+            print_status "   Bucket emptied"
+        else
+            print_warning "   Could not empty bucket (may already be empty)"
+        fi
     else
-        print_warning "   Could not empty bucket (may already be empty)"
+        print_status "   Bucket is already empty"
     fi
 
-    # Delete all versions (if versioned)
+    # Delete all versions (if versioned) - suppress output
     print_status "   Removing all object versions..."
-    aws s3api list-object-versions --bucket "$bucket_name" --output json 2>/dev/null | \
-        jq -r '.Versions[]?, .DeleteMarkers[]? | "\(.Key) \(.VersionId)"' 2>/dev/null | \
-        while read key version; do
-            aws s3api delete-object --bucket "$bucket_name" --key "$key" --version-id "$version" 2>/dev/null || true
-        done
+    VERSION_COUNT=$(aws s3api list-object-versions --bucket "$bucket_name" --output json 2>/dev/null | \
+        jq -r '.Versions[]?, .DeleteMarkers[]? | "\(.Key) \(.VersionId)"' 2>/dev/null | wc -l || echo "0")
+
+    if [ "$VERSION_COUNT" -gt 0 ]; then
+        print_status "   Deleting $VERSION_COUNT version(s)..."
+        aws s3api list-object-versions --bucket "$bucket_name" --output json 2>/dev/null | \
+            jq -r '.Versions[]?, .DeleteMarkers[]? | "\(.Key) \(.VersionId)"' 2>/dev/null | \
+            while read key version; do
+                aws s3api delete-object --bucket "$bucket_name" --key "$key" --version-id "$version" --output text >/dev/null 2>&1 || true
+            done
+        print_status "   Versions removed"
+    fi
 
     # Delete bucket
     if aws s3 rb "s3://$bucket_name" 2>/dev/null; then
         print_success "   ✅ Bucket deleted: $bucket_name"
     else
-        print_warning "   ⚠️ Could not delete bucket: $bucket_name (may already be deleted)"
+        # Bucket may have been deleted by CloudFormation already
+        if ! aws s3api head-bucket --bucket "$bucket_name" 2>/dev/null; then
+            print_success "   ✅ Bucket already deleted by CloudFormation: $bucket_name"
+        else
+            print_warning "   ⚠️ Could not delete bucket: $bucket_name"
+            print_status "   You may need to delete it manually from the AWS Console"
+        fi
     fi
 }
 
@@ -431,8 +455,9 @@ BDA_PROJECTS=$(aws bedrock-data-automation list-data-automation-projects \
 
 if [ -n "$BDA_PROJECTS" ]; then
     for project_arn in $BDA_PROJECTS; do
-        print_status "Deleting BDA project: $project_arn"
-        if aws bedrock-data-automation delete-data-automation-project --project-arn "$project_arn" 2>/dev/null; then
+        PROJECT_ID=$(echo "$project_arn" | awk -F'/' '{print $NF}')
+        print_status "Deleting BDA project: .../$PROJECT_ID"
+        if aws bedrock-data-automation delete-data-automation-project --project-arn "$project_arn" --output text >/dev/null 2>&1; then
             print_success "   ✅ BDA project deleted"
         else
             print_warning "   ⚠️ Could not delete BDA project (may already be deleted)"
@@ -449,9 +474,9 @@ echo ""
 
 ECR_REPOS=("pdf2html-lambda")
 for repo in "${ECR_REPOS[@]}"; do
-    if aws ecr describe-repositories --repository-names "$repo" --region $REGION >/dev/null 2>&1; then
+    if aws ecr describe-repositories --repository-names "$repo" --region $REGION --output text >/dev/null 2>&1; then
         print_status "Deleting ECR repository: $repo"
-        if aws ecr delete-repository --repository-name "$repo" --force --region $REGION 2>/dev/null; then
+        if aws ecr delete-repository --repository-name "$repo" --force --region $REGION --output text >/dev/null 2>&1; then
             print_success "   ✅ Repository deleted: $repo"
         else
             print_warning "   ⚠️ Could not delete repository: $repo"
@@ -465,9 +490,9 @@ print_header "🔧 Step 5/7: Deleting Secrets Manager secrets..."
 echo ""
 
 SECRET_ID="/myapp/client_credentials"
-if aws secretsmanager describe-secret --secret-id "$SECRET_ID" --region $REGION >/dev/null 2>&1; then
+if aws secretsmanager describe-secret --secret-id "$SECRET_ID" --region $REGION --output text >/dev/null 2>&1; then
     print_status "Deleting secret: $SECRET_ID"
-    if aws secretsmanager delete-secret --secret-id "$SECRET_ID" --force-delete-without-recovery --region $REGION 2>/dev/null; then
+    if aws secretsmanager delete-secret --secret-id "$SECRET_ID" --force-delete-without-recovery --region $REGION --output text >/dev/null 2>&1; then
         print_success "   ✅ Secret deleted: $SECRET_ID"
     else
         print_warning "   ⚠️ Could not delete secret: $SECRET_ID"

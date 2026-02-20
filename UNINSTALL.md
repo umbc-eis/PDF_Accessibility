@@ -76,6 +76,15 @@ The script automatically detects what's deployed in your account:
 - Locates CodeBuild projects
 - Identifies IAM roles and policies
 
+### Privacy Protection
+The script minimizes sensitive information exposure:
+- **Suppresses filenames**: Shows counts instead of actual S3 object names
+- **Hides ARN details**: Shows only resource IDs where possible
+- **Quiet output**: AWS CLI responses are suppressed to avoid leaking data
+- **No credentials exposed**: Never outputs secrets or API keys
+
+**Note:** Your AWS Account ID may still appear in some outputs (ARNs). This is not a secret credential but is minimized where possible.
+
 ### Order of Operations
 Resources are deleted in the correct order to avoid dependency errors:
 1. CloudFormation stacks (most infrastructure)
@@ -90,6 +99,7 @@ Resources are deleted in the correct order to avoid dependency errors:
 - Continues even if some resources don't exist
 - Provides clear status messages for each operation
 - Reports errors but continues cleanup
+- Handles race conditions (e.g., CloudFormation deleting resources first)
 
 ## Usage Examples
 
