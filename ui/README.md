@@ -2,7 +2,7 @@
 
 This repository provides the **web-based user interface** for the PDF Accessibility Solutions, enabling users to easily upload, process, and download accessibility-compliant PDF documents through an intuitive web application.
 
-> **⚠️ Important:** This is the frontend UI component. You must first deploy the [PDF Accessibility Backend](https://github.com/ASUCICREPO/PDF_Accessibility) before deploying this UI.
+> **⚠️ Important:** This is the frontend UI component. You must first deploy the [PDF Accessibility Backend](https://github.com/umbc-eis/PDF_Accessibility) before deploying this UI.
 
 ## Disclaimers
 
@@ -54,8 +54,8 @@ The application features user authentication, quota management, real-time proces
 
 **You must deploy the backend solutions first!** The UI requires at least one of the following:
 
-- **PDF-to-PDF Backend**: Deployed from [PDF_Accessibility repository](https://github.com/ASUCICREPO/PDF_Accessibility)
-- **PDF-to-HTML Backend**: Deployed from [PDF_Accessibility repository](https://github.com/ASUCICREPO/PDF_Accessibility)
+- **PDF-to-PDF Backend**: Deployed from [PDF_Accessibility repository](https://github.com/umbc-eis/PDF_Accessibility)
+- **PDF-to-HTML Backend**: Deployed from [PDF_Accessibility repository](https://github.com/umbc-eis/PDF_Accessibility)
 
 After deploying the backend, you'll need the **S3 bucket name(s)** created during deployment.
 
@@ -82,8 +82,8 @@ After deploying the backend, you'll need the **S3 bucket name(s)** created durin
 ### Step 1: Open AWS CloudShell and Clone the Repository
 
 ```bash
-git clone https://github.com/ASUCICREPO/PDF_accessability_UI.git
-cd PDF_accessability_UI
+git clone https://github.com/umbc-eis/PDF_Accessibility.git
+cd PDF_Accessibility/ui
 ```
 
 ### Step 2: Run the Deployment Script
@@ -363,7 +363,7 @@ This project is licensed under the terms specified in the LICENSE file.
 For questions, issues, or support:
 
 - **Email**: ai-cic@amazon.com
-- **Issues**: [GitHub Issues](https://github.com/ASUCICREPO/PDF_accessability_UI/issues)
+- **Issues**: [GitHub Issues](https://github.com/umbc-eis/PDF_Accessibility/issues)
 
 ---
 

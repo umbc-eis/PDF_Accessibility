@@ -357,4 +357,4 @@ These permissions are granted to resources created during deployment for runtime
 
 For questions about IAM permissions or deployment issues:
 - **Email**: ai-cic@amazon.com
-- **Backend Repository**: [PDF_Accessibility](https://github.com/ASUCICREPO/PDF_Accessibility)
+- **Backend Repository**: [PDF_Accessibility](https://github.com/umbc-eis/PDF_Accessibility)

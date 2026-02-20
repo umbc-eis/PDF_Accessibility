@@ -254,7 +254,7 @@ If you encounter issues during uninstallation:
 1. Check the AWS CloudFormation console for detailed error messages
 2. Review CloudWatch logs for stuck resources
 3. Contact support: **ai-cic@amazon.com**
-4. Report issues: [GitHub Issues](https://github.com/ASUCICREPO/PDF_Accessibility/issues)
+4. Report issues: [GitHub Issues](https://github.com/umbc-eis/PDF_Accessibility/issues)
 
 ## Manual Uninstall Alternative
 

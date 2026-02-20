@@ -8,8 +8,8 @@ phases:
     commands:
       - echo "Installing zip utility..."
       - yum install -y zip
-      - echo "Changing into pdf_ui directory"
-      - cd pdf_ui
+      - echo "Changing into ui/pdf_ui directory"
+      - cd ui/pdf_ui
 
   pre_build:
     commands:

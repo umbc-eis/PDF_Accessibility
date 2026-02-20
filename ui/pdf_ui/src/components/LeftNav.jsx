@@ -139,7 +139,7 @@ const LeftNav = ({ isCollapsed, setIsCollapsed, mobileOpen, setMobileOpen }) => 
               Review documentation and access the GitHub repo at:
             </Typography>
             <Typography variant="body2" gutterBottom>
-              <Link href="https://github.com/ASUCICREPO/PDF_Accessibility" target="_blank" rel="noopener noreferrer">
+              <Link href="https://github.com/umbc-eis/PDF_Accessibility" target="_blank" rel="noopener noreferrer">
                 GitHub Repo
               </Link>
             </Typography>

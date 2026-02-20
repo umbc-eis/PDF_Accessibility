@@ -7,8 +7,8 @@ phases:
     commands:
       - echo "Installing AWS CDK CLI..."
       - npm install -g aws-cdk
-      - echo "Changing into cdk_backend directory"
-      - cd cdk_backend
+      - echo "Changing into ui/cdk_backend directory"
+      - cd ui/cdk_backend
       - echo "Installing npm dependencies"
       - npm ci
 

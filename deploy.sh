@@ -266,7 +266,7 @@ EOF
                         "Sid": "CloudFormationAccess",
                         "Effect": "Allow",
                         "Action": "cloudformation:*",
-                        "Resource": ["arn:aws:cloudformation:*:*:stack/PDFAccessibility*/*", "arn:aws:cloudformation:*:*:stack/CDKToolkit/*"]
+                        "Resource": "*"
                     },
                     {
                         "Sid": "LogsAccess",
@@ -353,7 +353,7 @@ EOF
                         "Sid": "CloudFormationAccess",
                         "Effect": "Allow",
                         "Action": "cloudformation:*",
-                        "Resource": ["arn:aws:cloudformation:*:*:stack/Pdf2Html*/*", "arn:aws:cloudformation:*:*:stack/pdf2html*/*", "arn:aws:cloudformation:*:*:stack/CDKToolkit/*"]
+                        "Resource": "*"
                     },
                     {
                         "Sid": "BedrockAccess",
@@ -1211,7 +1211,7 @@ print_success "✅ AWS credentials verified. Account: $ACCOUNT_ID, Region: $REGI
 echo ""
 
 # GitHub repository URL (hardcoded)
-GITHUB_URL="https://github.com/ASUCICREPO/PDF_Accessibility.git"
+GITHUB_URL="https://github.com/umbc-eis/PDF_Accessibility.git"
 print_success "   Repository: $GITHUB_URL ✅"
 echo ""
 

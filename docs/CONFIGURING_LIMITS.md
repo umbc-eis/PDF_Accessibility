@@ -2,7 +2,7 @@
 
 This guide explains the configurable limits across the PDF Accessibility solution and how to modify them. Limits exist at two levels:
 
-1. **User-Facing Limits (UI)** — Per-user quotas for file uploads, page counts, and file size, managed through Cognito custom attributes in the [PDF_accessability_UI](https://github.com/ASUCICREPO/PDF_accessability_UI) repository.
+1. **User-Facing Limits (UI)** — Per-user quotas for file uploads, page counts, and file size, managed through Cognito custom attributes in the [PDF_accessability_UI](https://github.com/umbc-eis/PDF_Accessibility) repository.
 2. **Infrastructure Limits (Backend)** — Resource-level settings such as Lambda timeouts, memory, chunk sizes, and concurrency, managed in this repository.
 
 ---
@@ -21,7 +21,7 @@ This guide explains the configurable limits across the PDF Accessibility solutio
 
 ## User-Facing Limits (UI)
 
-When the [PDF Accessibility UI](https://github.com/ASUCICREPO/PDF_accessability_UI) is deployed, each user is assigned limits via Cognito custom attributes. These limits control what users can upload through the web interface.
+When the [PDF Accessibility UI](https://github.com/umbc-eis/PDF_Accessibility) is deployed, each user is assigned limits via Cognito custom attributes. These limits control what users can upload through the web interface.
 
 ### Custom Cognito Attributes
 
@@ -69,7 +69,7 @@ The updated limits take effect immediately on the user's next upload attempt.
 
 ## Modifying Default Group Limits in Code
 
-To change the **default limits** that are assigned to all new users, you need to update two Lambda functions in the [PDF_accessability_UI](https://github.com/ASUCICREPO/PDF_accessability_UI) repository and redeploy.
+To change the **default limits** that are assigned to all new users, you need to update two Lambda functions in the [PDF_accessability_UI](https://github.com/umbc-eis/PDF_Accessibility) repository and redeploy.
 
 ### File 1: Post-Confirmation Lambda
 
@@ -290,4 +290,4 @@ For details on CLI options and configuration file format, see the [pdf2html READ
 For questions or assistance with configuration:
 
 - **Email**: ai-cic@amazon.com
-- **Issues**: [GitHub Issues](https://github.com/ASUCICREPO/PDF_Accessibility/issues)
+- **Issues**: [GitHub Issues](https://github.com/umbc-eis/PDF_Accessibility/issues)
