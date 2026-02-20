@@ -37,6 +37,7 @@ All work produced is open source. More information can be found in the GitHub re
 | [Architecture Overview](#architecture-overview)                                     | High level overview illustrating component interactions |
 | [Automated One Click Deployment](#automated-one-click-deployment)                   | How to deploy the project                               |
 | [Testing Your PDF Accessibility Solution](#testing-your-pdf-accessibility-solution) | User guide for the working solution                     |
+| [Uninstalling](#uninstalling)                                                       | How to safely remove all deployed resources             |
 | [PDF-to-PDF Remediation Solution](#pdf-to-pdf-remediation-solution)                 | PDF format preservation solution details                |
 | [PDF-to-HTML Remediation Solution](#pdf-to-html-remediation-solution)               | HTML conversion solution details                        |
 | [Configuring Limits](docs/CONFIGURING_LIMITS.md)                                   | How to modify document limits, quotas, and defaults     |
@@ -172,6 +173,36 @@ aws codebuild start-build --project-name YOUR-PROJECT-NAME --source-version main
 ```
 
 Or simply re-run the deployment script and choose the solution your want redeploy.
+
+## Uninstalling
+
+To safely remove all deployed resources from your AWS account:
+
+```bash
+./uninstall.sh
+```
+
+The uninstall script will:
+- Automatically detect all deployed solutions (PDF-to-PDF, PDF-to-HTML, and UI)
+- Show you exactly what will be deleted
+- Require confirmation before proceeding
+- Remove all resources in the correct order
+
+**What gets deleted:**
+- CloudFormation stacks (backend and UI)
+- S3 buckets and all contents (backup your data first!)
+- Lambda functions and ECS resources
+- ECR repositories
+- IAM roles and policies
+- CloudWatch logs and dashboards
+- Secrets Manager secrets
+- Bedrock Data Automation projects
+- CodeBuild projects
+- Cognito User Pools (if UI was deployed)
+- Amplify Apps (if UI was deployed)
+- API Gateway (if UI was deployed)
+
+For detailed uninstall instructions and troubleshooting, see [UNINSTALL.md](UNINSTALL.md).
 
 ## PDF-to-PDF Remediation Solution
 
