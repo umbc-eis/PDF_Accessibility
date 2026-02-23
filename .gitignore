@@ -1,5 +1,8 @@
 *.swp
 package-lock.json
+# But DO track lock files needed for CodeBuild CI
+!ui/cdk_backend/package-lock.json
+!ui/pdf_ui/package-lock.json
 __pycache__
 .pytest_cache
 .venv
