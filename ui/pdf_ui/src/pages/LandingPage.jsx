@@ -22,7 +22,7 @@ const LandingPage = () => {
   useEffect(() => {
     if (auth.isLoading) return;
     if (auth.isAuthenticated) {
-      navigate(‘/app’, { replace: true });
+      navigate('/app', { replace: true });
     }
   }, [auth.isLoading, auth.isAuthenticated, navigate]);
 
@@ -37,14 +37,14 @@ const LandingPage = () => {
     return (
       <Box
         sx={{
-          minHeight: ‘100vh’,
-          display: ‘flex’,
-          alignItems: ‘center’,
-          justifyContent: ‘center’,
-          backgroundColor: ‘#fff’,
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#fff',
         }}
       >
-        <CircularProgress size={50} thickness={5} sx={{ color: ‘#000’ }} />
+        <CircularProgress size={50} thickness={5} sx={{ color: '#000' }} />
       </Box>
     );
   }
@@ -52,31 +52,31 @@ const LandingPage = () => {
   return (
     <Box
       sx={{
-        backgroundColor: ‘#fff’,
-        minHeight: ‘100vh’,
-        display: ‘flex’,
-        flexDirection: ‘column’,
-        fontFamily: ‘Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif’,
+        backgroundColor: '#fff',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
       {/* Header with UMBC Black bar */}
       <Box
         sx={{
-          backgroundColor: ‘#000’,
-          height: ‘80px’,
-          width: ‘100%’,
-          display: ‘flex’,
-          alignItems: ‘center’,
-          justifyContent: ‘space-between’,
+          backgroundColor: '#000',
+          height: '80px',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           px: 4,
         }}
       >
         <Typography
           variant="h5"
           sx={{
-            color: ‘#fdb515’,
+            color: '#fdb515',
             fontWeight: 600,
-            letterSpacing: ‘0.5px’,
+            letterSpacing: '0.5px',
           }}
         >
           PDF Accessibility
@@ -88,12 +88,12 @@ const LandingPage = () => {
         maxWidth="md"
         sx={{
           flex: 1,
-          display: ‘flex’,
-          flexDirection: ‘column’,
-          alignItems: ‘center’,
-          justifyContent: ‘center’,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
           py: 8,
-          textAlign: ‘center’,
+          textAlign: 'center',
         }}
       >
         <Typography
@@ -102,7 +102,7 @@ const LandingPage = () => {
           sx={{
             fontWeight: 600,
             mb: 3,
-            color: ‘#000’,
+            color: '#000',
           }}
         >
           PDF Accessibility Remediation
@@ -112,8 +112,8 @@ const LandingPage = () => {
           variant="h6"
           sx={{
             mb: 5,
-            color: ‘#636466’,
-            maxWidth: ‘600px’,
+            color: '#636466',
+            maxWidth: '600px',
             lineHeight: 1.6,
             fontWeight: 400,
           }}
@@ -129,42 +129,42 @@ const LandingPage = () => {
           onClick={handleSignIn}
           disabled={loading}
           sx={{
-            backgroundColor: ‘#fdb515’,
-            color: ‘#000’,
+            backgroundColor: '#fdb515',
+            color: '#000',
             fontWeight: 600,
-            fontSize: ‘1.1rem’,
+            fontSize: '1.1rem',
             px: 6,
             py: 2,
-            borderRadius: ‘8px’,
-            textTransform: ‘none’,
-            transition: ‘all 0.2s’,
-            ‘&:hover’: {
-              backgroundColor: ‘#e6a413’,
-              transform: ‘translateY(-2px)’,
-              boxShadow: ‘0 4px 12px rgba(253, 181, 21, 0.4)’,
+            borderRadius: '8px',
+            textTransform: 'none',
+            transition: 'all 0.2s',
+            '&:hover': {
+              backgroundColor: '#e6a413',
+              transform: 'translateY(-2px)',
+              boxShadow: '0 4px 12px rgba(253, 181, 21, 0.4)',
             },
-            ‘&:disabled’: {
-              backgroundColor: ‘#c7c8ca’,
-              color: ‘#636466’,
+            '&:disabled': {
+              backgroundColor: '#c7c8ca',
+              color: '#636466',
             },
           }}
         >
-          {loading ? <CircularProgress size={24} sx={{ color: ‘#000’ }} /> : ‘Sign In’}
+          {loading ? <CircularProgress size={24} sx={{ color: '#000' }} /> : 'Sign In'}
         </Button>
       </Container>
 
       {/* Footer */}
       <Box
         sx={{
-          borderTop: ‘1px solid #c7c8ca’,
+          borderTop: '1px solid #c7c8ca',
           py: 3,
-          textAlign: ‘center’,
+          textAlign: 'center',
         }}
       >
         <Typography
           variant="body2"
           sx={{
-            color: ‘#636466’,
+            color: '#636466',
           }}
         >
           University of Maryland, Baltimore County
