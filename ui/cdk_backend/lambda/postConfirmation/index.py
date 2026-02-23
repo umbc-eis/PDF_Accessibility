@@ -2,6 +2,8 @@ import json
 import os
 import boto3
 
+ADMIN_EMAILS = ['champ@umbc.edu', 'paluck@umbc.edu']
+
 def handler(event, context):
     print('Post Confirmation Trigger Event:', json.dumps(event, indent=2))
     if event['triggerSource'] != 'PostConfirmation_ConfirmSignUp':
@@ -11,18 +13,17 @@ def handler(event, context):
     # Retrieve group names from environment variables
     DEFAULT_GROUP = str(os.environ.get('DEFAULT_GROUP_NAME'))
     ADMIN_GROUP = str(os.environ.get('ADMIN_GROUP_NAME'))
+    SNS_TOPIC_ARN = os.environ.get('SNS_TOPIC_ARN', '')
 
     # Define attribute defaults based on group
     group_attributes = {
         DEFAULT_GROUP: {
-            'custom:first_sign_in': 'true',
             'custom:total_files_uploaded': '0',
             'custom:max_files_allowed': '25',
             'custom:max_pages_allowed': '25',
             'custom:max_size_allowed_MB': '25'
         },
         ADMIN_GROUP: {
-            'custom:first_sign_in': 'true',
             'custom:total_files_uploaded': '0',
             'custom:max_files_allowed': '100',
             'custom:max_pages_allowed': '2500',
@@ -44,8 +45,7 @@ def handler(event, context):
             raise Exception('Only @umbc.edu email addresses are allowed to register.')
 
         # Determine the group to assign the user to
-        # Assign specific users to AdminUsers group
-        if user_email in ['champ@umbc.edu', 'paluck@umbc.edu']:
+        if user_email in ADMIN_EMAILS:
             assigned_group = ADMIN_GROUP
         else:
             assigned_group = DEFAULT_GROUP
@@ -69,6 +69,38 @@ def handler(event, context):
                 UserAttributes=user_attributes
             )
             print(f'Successfully initialized attributes for group {assigned_group}.')
+
+        # Disable non-admin users until an admin approves them
+        if user_email not in ADMIN_EMAILS:
+            cognito_idp.admin_disable_user(
+                UserPoolId=user_pool_id,
+                Username=username
+            )
+            print(f'User {username} ({user_email}) has been disabled pending admin approval.')
+
+            # Send SNS notification to admins
+            if SNS_TOPIC_ARN:
+                sns = boto3.client('sns')
+                given_name = event['request']['userAttributes'].get('given_name', '')
+                family_name = event['request']['userAttributes'].get('family_name', '')
+                sns.publish(
+                    TopicArn=SNS_TOPIC_ARN,
+                    Subject='New PDF Accessibility UI Signup - Approval Required',
+                    Message=(
+                        f'A new user has signed up and requires admin approval:\n\n'
+                        f'  Name: {given_name} {family_name}\n'
+                        f'  Email: {user_email}\n'
+                        f'  Username: {username}\n\n'
+                        f'The user has been disabled and cannot log in until enabled.\n\n'
+                        f'To approve this user, go to the Cognito Console:\n'
+                        f'  1. Navigate to the User Pool\n'
+                        f'  2. Find the user by email\n'
+                        f'  3. Click "Enable user"\n'
+                    )
+                )
+                print(f'Admin notification sent for user {user_email}.')
+        else:
+            print(f'Admin user {user_email} auto-approved (not disabled).')
 
     except Exception as error:
         print(f'Error in post confirmation trigger: {error}')

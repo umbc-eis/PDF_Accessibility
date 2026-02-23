@@ -34,6 +34,8 @@ DEPLOYED_BUCKETS=()
 FIRST_SOLUTION=""
 PDF2PDF_BUCKET=""
 PDF2HTML_BUCKET=""
+DETECTED_UI_BACKEND=""
+DETECTED_UI_PROJECTS=""
 
 echo ""
 print_header "🎉 Welcome to PDF Accessibility Solutions Enhanced Deployment! 🎉"
@@ -58,6 +60,9 @@ echo "   • Web interface for both solutions"
 echo "   • User authentication with Cognito"
 echo "   • File upload and processing monitoring"
 echo "   • Best for: End-user accessibility"
+echo ""
+echo "💡 Tip: If you've already deployed backends, you can deploy or"
+echo "   redeploy the UI independently using option 3 in the menu below."
 echo ""
 
 # Function to deploy backend solution
@@ -899,6 +904,267 @@ configure_custom_domain() {
     return 0
 }
 
+# Function to detect existing backend deployments (for UI-only mode)
+detect_existing_deployments() {
+    print_status "🔍 Scanning for existing backend deployments..."
+    echo ""
+
+    DEPLOYED_SOLUTIONS=()
+    PDF2PDF_BUCKET=""
+    PDF2HTML_BUCKET=""
+    DETECTED_UI_BACKEND=""
+    DETECTED_UI_PROJECTS=""
+
+    # Check for PDF-to-PDF stack
+    if aws cloudformation describe-stacks --stack-name PDFAccessibility --region $REGION >/dev/null 2>&1; then
+        DEPLOYED_SOLUTIONS+=("pdf2pdf")
+        print_success "   Found PDF-to-PDF backend (PDFAccessibility stack)"
+
+        # Try to find associated bucket
+        PDF2PDF_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name PDFAccessibility \
+            --query 'Stacks[0].Outputs[?contains(OutputKey, `Bucket`)].OutputValue' \
+            --output text 2>/dev/null | head -1)
+
+        if [ -z "$PDF2PDF_BUCKET" ] || [ "$PDF2PDF_BUCKET" == "None" ]; then
+            PDF2PDF_BUCKET=$(aws s3api list-buckets \
+                --query 'Buckets[?contains(Name, `pdfaccessibility`)] | sort_by(@, &CreationDate) | [-1].Name' \
+                --output text 2>/dev/null)
+        fi
+
+        if [ -n "$PDF2PDF_BUCKET" ] && [ "$PDF2PDF_BUCKET" != "None" ]; then
+            print_status "     Bucket: $PDF2PDF_BUCKET"
+        fi
+    fi
+
+    # Check for PDF-to-HTML bucket
+    local pdf2html_bucket_name="pdf2html-bucket-${ACCOUNT_ID}-${REGION}"
+    if aws s3api head-bucket --bucket "$pdf2html_bucket_name" 2>/dev/null; then
+        DEPLOYED_SOLUTIONS+=("pdf2html")
+        PDF2HTML_BUCKET="$pdf2html_bucket_name"
+        print_success "   Found PDF-to-HTML backend (S3 bucket exists)"
+        print_status "     Bucket: $PDF2HTML_BUCKET"
+    fi
+
+    # Check for existing UI backend stack (CdkBackendStack)
+    UI_BACKEND_STACKS=$(aws cloudformation list-stacks \
+        --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE CREATE_FAILED ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE \
+        --query 'StackSummaries[?contains(StackName, `CdkBackendStack`)].StackName' \
+        --output text 2>/dev/null)
+
+    if [ -n "$UI_BACKEND_STACKS" ] && [ "$UI_BACKEND_STACKS" != "None" ]; then
+        DETECTED_UI_BACKEND="$UI_BACKEND_STACKS"
+        print_warning "   Found previous UI backend stack(s): $DETECTED_UI_BACKEND"
+    fi
+
+    # Check for existing pdf-ui-* CodeBuild projects
+    UI_PROJECTS=$(aws codebuild list-projects \
+        --query 'projects[?contains(@, `pdf-ui`)]' \
+        --output text 2>/dev/null)
+
+    if [ -n "$UI_PROJECTS" ] && [ "$UI_PROJECTS" != "None" ]; then
+        DETECTED_UI_PROJECTS="$UI_PROJECTS"
+        print_warning "   Found previous UI CodeBuild project(s): $DETECTED_UI_PROJECTS"
+    fi
+
+    echo ""
+
+    # Return failure if no backends found
+    if [ ${#DEPLOYED_SOLUTIONS[@]} -eq 0 ]; then
+        print_error "No existing backend deployments found."
+        print_error "You must deploy at least one backend (PDF-to-PDF or PDF-to-HTML) before deploying the UI."
+        print_status "Please run this script again and choose option 1 or 2 first."
+        return 1
+    fi
+
+    return 0
+}
+
+# Function to clean up previous UI deployment artifacts
+cleanup_previous_ui() {
+    print_header "🧹 Cleaning up previous UI deployment artifacts..."
+    echo ""
+
+    # Delete CdkBackendStack(s)
+    if [ -n "$DETECTED_UI_BACKEND" ]; then
+        for stack in $DETECTED_UI_BACKEND; do
+            print_status "Deleting CloudFormation stack: $stack"
+            if aws cloudformation delete-stack --stack-name "$stack" --region $REGION 2>/dev/null; then
+                print_status "   Waiting for stack deletion..."
+                local wait_count=0
+                local max_wait=120
+                while [ $wait_count -lt $max_wait ]; do
+                    STACK_STATUS=$(aws cloudformation describe-stacks \
+                        --stack-name "$stack" \
+                        --query 'Stacks[0].StackStatus' \
+                        --output text 2>/dev/null || echo "DELETE_COMPLETE")
+                    if [ "$STACK_STATUS" == "DELETE_COMPLETE" ] || [ "$STACK_STATUS" == "" ]; then
+                        print_success "   Stack deleted: $stack"
+                        break
+                    elif [ "$STACK_STATUS" == "DELETE_FAILED" ]; then
+                        print_warning "   Stack deletion failed: $stack (continuing anyway)"
+                        break
+                    fi
+                    printf "."
+                    sleep 10
+                    wait_count=$((wait_count + 1))
+                done
+            else
+                print_warning "   Could not delete stack: $stack"
+            fi
+        done
+        echo ""
+    fi
+
+    # Delete AmplifyHosting stacks
+    AMPLIFY_STACKS=$(aws cloudformation list-stacks \
+        --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE CREATE_FAILED ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE \
+        --query 'StackSummaries[?contains(StackName, `AmplifyHosting`)].StackName' \
+        --output text 2>/dev/null)
+
+    if [ -n "$AMPLIFY_STACKS" ] && [ "$AMPLIFY_STACKS" != "None" ]; then
+        for stack in $AMPLIFY_STACKS; do
+            print_status "Deleting Amplify hosting stack: $stack"
+            if aws cloudformation delete-stack --stack-name "$stack" --region $REGION 2>/dev/null; then
+                print_status "   Waiting for stack deletion..."
+                local wait_count=0
+                local max_wait=120
+                while [ $wait_count -lt $max_wait ]; do
+                    STACK_STATUS=$(aws cloudformation describe-stacks \
+                        --stack-name "$stack" \
+                        --query 'Stacks[0].StackStatus' \
+                        --output text 2>/dev/null || echo "DELETE_COMPLETE")
+                    if [ "$STACK_STATUS" == "DELETE_COMPLETE" ] || [ "$STACK_STATUS" == "" ]; then
+                        print_success "   Stack deleted: $stack"
+                        break
+                    elif [ "$STACK_STATUS" == "DELETE_FAILED" ]; then
+                        print_warning "   Stack deletion failed: $stack (continuing anyway)"
+                        break
+                    fi
+                    printf "."
+                    sleep 10
+                    wait_count=$((wait_count + 1))
+                done
+            else
+                print_warning "   Could not delete stack: $stack"
+            fi
+        done
+        echo ""
+    fi
+
+    # Delete pdf-ui-* CodeBuild projects
+    if [ -n "$DETECTED_UI_PROJECTS" ]; then
+        for project in $DETECTED_UI_PROJECTS; do
+            print_status "Deleting CodeBuild project: $project"
+            aws codebuild delete-project --name "$project" 2>/dev/null && \
+                print_success "   Project deleted: $project" || \
+                print_warning "   Could not delete project: $project"
+        done
+        echo ""
+    fi
+
+    # Delete pdf-ui-* IAM roles (detach policies first)
+    for project in $DETECTED_UI_PROJECTS; do
+        local role_name="${project}-service-role"
+        if aws iam get-role --role-name "$role_name" >/dev/null 2>&1; then
+            print_status "Deleting IAM role: $role_name"
+
+            # Detach managed policies
+            ATTACHED_POLICIES=$(aws iam list-attached-role-policies \
+                --role-name "$role_name" \
+                --query 'AttachedPolicies[*].PolicyArn' \
+                --output text 2>/dev/null)
+            for policy_arn in $ATTACHED_POLICIES; do
+                aws iam detach-role-policy --role-name "$role_name" --policy-arn "$policy_arn" 2>/dev/null || true
+            done
+
+            # Delete inline policies
+            INLINE_POLICIES=$(aws iam list-role-policies \
+                --role-name "$role_name" \
+                --query 'PolicyNames[*]' \
+                --output text 2>/dev/null)
+            for policy_name in $INLINE_POLICIES; do
+                aws iam delete-role-policy --role-name "$role_name" --policy-name "$policy_name" 2>/dev/null || true
+            done
+
+            # Delete the role
+            aws iam delete-role --role-name "$role_name" 2>/dev/null && \
+                print_success "   Role deleted: $role_name" || \
+                print_warning "   Could not delete role: $role_name"
+
+            # Delete associated custom policy
+            local ui_policy_name="${project}-deployment-policy"
+            local ui_policy_arn="arn:aws:iam::${ACCOUNT_ID}:policy/${ui_policy_name}"
+            if aws iam get-policy --policy-arn "$ui_policy_arn" >/dev/null 2>&1; then
+                VERSIONS=$(aws iam list-policy-versions \
+                    --policy-arn "$ui_policy_arn" \
+                    --query 'Versions[?!IsDefaultVersion].VersionId' \
+                    --output text 2>/dev/null)
+                for version in $VERSIONS; do
+                    aws iam delete-policy-version --policy-arn "$ui_policy_arn" --version-id "$version" 2>/dev/null || true
+                done
+                aws iam delete-policy --policy-arn "$ui_policy_arn" 2>/dev/null && \
+                    print_success "   Policy deleted: $ui_policy_name" || \
+                    print_warning "   Could not delete policy: $ui_policy_name"
+            fi
+        fi
+    done
+
+    echo ""
+    print_success "Cleanup complete."
+    echo ""
+}
+
+# Function to deploy UI only (when backends already exist)
+deploy_ui_only() {
+    print_header "🎨 Deploy UI Only Mode"
+    print_header "======================"
+    echo ""
+
+    # Detect existing backends
+    if ! detect_existing_deployments; then
+        return 1
+    fi
+
+    # Show what was detected
+    print_status "Detected backends:"
+    for solution in "${DEPLOYED_SOLUTIONS[@]}"; do
+        if [ "$solution" == "pdf2pdf" ]; then
+            print_status "   PDF-to-PDF Remediation: $PDF2PDF_BUCKET"
+        elif [ "$solution" == "pdf2html" ]; then
+            print_status "   PDF-to-HTML Remediation: $PDF2HTML_BUCKET"
+        fi
+    done
+    echo ""
+
+    # If previous UI artifacts exist, offer cleanup
+    if [ -n "$DETECTED_UI_BACKEND" ] || [ -n "$DETECTED_UI_PROJECTS" ]; then
+        print_warning "Previous UI deployment artifacts detected."
+        print_warning "These should be cleaned up before a fresh UI deployment."
+        echo ""
+        while true; do
+            read -p "Clean up previous UI artifacts before deploying? (y/n): " CLEANUP_CHOICE
+            case $CLEANUP_CHOICE in
+                [Yy]*)
+                    cleanup_previous_ui
+                    break
+                    ;;
+                [Nn]*)
+                    print_status "Skipping cleanup. Proceeding with UI deployment..."
+                    echo ""
+                    break
+                    ;;
+                *)
+                    print_error "Please answer yes (y) or no (n)."
+                    ;;
+            esac
+        done
+    fi
+
+    # Deploy the UI using the existing deploy_ui function
+    deploy_ui
+}
+
 # Function to deploy UI
 deploy_ui() {
     print_header "🎨 Deploying Frontend UI..."
@@ -1148,12 +1414,13 @@ echo ""
 
 # Step 1: Initial Solution Selection
 while true; do
-    echo "Which solution would you like to deploy first?"
+    echo "Which solution would you like to deploy?"
     echo "1) PDF-to-PDF Remediation"
     echo "2) PDF-to-HTML Remediation"
+    echo "3) Deploy UI Only (backends already deployed)"
     echo ""
-    read -p "Enter your choice (1 or 2): " SOLUTION_CHOICE
-    
+    read -p "Enter your choice (1, 2, or 3): " SOLUTION_CHOICE
+
     case $SOLUTION_CHOICE in
         1)
             DEPLOYMENT_TYPE="pdf2pdf"
@@ -1167,14 +1434,20 @@ while true; do
             FIRST_SOLUTION="pdf2html"
             break
             ;;
+        3)
+            FIRST_SOLUTION="ui_only"
+            break
+            ;;
         *)
-            print_error "Invalid choice. Please enter 1 or 2."
+            print_error "Invalid choice. Please enter 1, 2, or 3."
             echo ""
             ;;
     esac
 done
 
-print_success "✅ Selected: $SOLUTION_NAME"
+if [ "$FIRST_SOLUTION" != "ui_only" ]; then
+    print_success "✅ Selected: $SOLUTION_NAME"
+fi
 echo ""
 
 # Step 2: Common Configuration
@@ -1220,11 +1493,14 @@ PROJECT_NAME="pdfremediation-$(date +%Y%m%d%H%M%S)"
 print_success "   Project: $PROJECT_NAME ✅"
 echo ""
 
-# Step 3: Deploy first solution
-deploy_backend_solution "$DEPLOYMENT_TYPE" "$SOLUTION_NAME"
-
-# Step 4: Show next step options
-show_next_step_options "$FIRST_SOLUTION"
+if [ "$FIRST_SOLUTION" == "ui_only" ]; then
+    # UI-only path: detect backends, offer cleanup, deploy UI
+    deploy_ui_only
+else
+    # Original path: deploy backend, then show next step options
+    deploy_backend_solution "$DEPLOYMENT_TYPE" "$SOLUTION_NAME"
+    show_next_step_options "$FIRST_SOLUTION"
+fi
 
 # Step 5: Final success message
 echo ""

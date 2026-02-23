@@ -403,6 +403,22 @@ else
                 "codebuild:BatchGetProjects"
             ],
             "Resource": "arn:aws:codebuild:'"$AWS_REGION"':'"$AWS_ACCOUNT_ID"':project/pdf-ui-*"
+        },
+        {
+            "Sid": "SNSAccess",
+            "Effect": "Allow",
+            "Action": [
+                "sns:CreateTopic",
+                "sns:DeleteTopic",
+                "sns:Subscribe",
+                "sns:Unsubscribe",
+                "sns:Publish",
+                "sns:GetTopicAttributes",
+                "sns:SetTopicAttributes",
+                "sns:TagResource",
+                "sns:ListSubscriptionsByTopic"
+            ],
+            "Resource": "arn:aws:sns:'"$AWS_REGION"':'"$AWS_ACCOUNT_ID"':pdf-ui-*"
         }
     ]
 }'

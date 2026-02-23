@@ -10,7 +10,6 @@ import ProcessingContainer from './components/ProcessingContainer';
 import ResultsContainer from './components/ResultsContainer';
 import LeftNav from './components/LeftNav';
 import theme from './theme';
-import FirstSignInDialog from './components/FirstSignInDialog';
 import HeroSection from './components/HeroSection';
 import InformationBlurb from './components/InformationBlurb';
 
@@ -240,8 +239,6 @@ function MainApp({ isLoggingOut, setIsLoggingOut }) {
             maxFilesAllowed={maxFilesAllowed}
             onMenuClick={() => setMobileNavOpen(true)}
           />
-
-          <FirstSignInDialog />
 
           {/* Deployment popup for bucket configuration - only shown when triggered */}
           {showDeploymentPopup && bucketValidation && (

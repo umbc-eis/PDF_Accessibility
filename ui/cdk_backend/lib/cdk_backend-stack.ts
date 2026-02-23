@@ -7,6 +7,8 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 
 import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
@@ -233,6 +235,21 @@ export class CdkBackendStack extends cdk.Stack {
     // NOTE: Cognito permissions are attached via CfnPolicy after user pool creation
     // to scope to exact ARN while avoiding circular dependency (see below)
 
+    // =====================================================================
+    // SNS Topic for Signup Notifications
+    // =====================================================================
+    const signupNotificationTopic = new sns.Topic(this, 'SignupNotificationTopic', {
+      topicName: 'pdf-ui-signup-notifications',
+      displayName: 'PDF UI Signup Notifications',
+    });
+
+    signupNotificationTopic.addSubscription(
+      new snsSubscriptions.EmailSubscription('paluck@umbc.edu')
+    );
+    signupNotificationTopic.addSubscription(
+      new snsSubscriptions.EmailSubscription('champ@umbc.edu')
+    );
+
     // Create the Lambda with the role
     const postConfirmationFn = new lambda.Function(this, 'PostConfirmationLambda', {
       runtime: lambda.Runtime.PYTHON_3_12,
@@ -243,6 +260,7 @@ export class CdkBackendStack extends cdk.Stack {
       environment: {
         DEFAULT_GROUP_NAME: Default_Group,
         ADMIN_GROUP_NAME: Admin_Group,
+        SNS_TOPIC_ARN: signupNotificationTopic.topicArn,
       },
     });
 
@@ -365,15 +383,10 @@ def handler(event, context):
 
       },
       customAttributes: {
-        first_sign_in: new cognito.BooleanAttribute({ mutable: true }),
         total_files_uploaded: new cognito.NumberAttribute({ mutable: true }),
         max_files_allowed: new cognito.NumberAttribute({ mutable: true }),
         max_pages_allowed: new cognito.NumberAttribute({ mutable: true }),
         max_size_allowed_MB: new cognito.NumberAttribute({ mutable: true }),
-        organization: new cognito.StringAttribute({ mutable: true }),
-        country: new cognito.StringAttribute({ mutable: true }),
-        state: new cognito.StringAttribute({ mutable: true }),
-        city: new cognito.StringAttribute({ mutable: true }),
         pdf2pdf: new cognito.NumberAttribute({ mutable: true }),
         pdf2html: new cognito.NumberAttribute({ mutable: true }),
       },
@@ -388,14 +401,22 @@ def handler(event, context):
       policyName: 'PostConfirmationCognitoAccess',
       policyDocument: {
         Version: '2012-10-17',
-        Statement: [{
-          Effect: 'Allow',
-          Action: [
-            'cognito-idp:AdminUpdateUserAttributes',
-            'cognito-idp:AdminAddUserToGroup',
-          ],
-          Resource: userPool.userPoolArn,
-        }],
+        Statement: [
+          {
+            Effect: 'Allow',
+            Action: [
+              'cognito-idp:AdminUpdateUserAttributes',
+              'cognito-idp:AdminAddUserToGroup',
+              'cognito-idp:AdminDisableUser',
+            ],
+            Resource: userPool.userPoolArn,
+          },
+          {
+            Effect: 'Allow',
+            Action: 'sns:Publish',
+            Resource: signupNotificationTopic.topicArn,
+          },
+        ],
       },
       roles: [postConfirmationLambdaRole.roleName],
     });
@@ -514,18 +535,6 @@ def handler(event, context):
 
 
 
-    // ------------------- Lambda Function for Post Confirmation -------------------
-    const updateAttributesFn = new lambda.Function(this, 'UpdateAttributesFn', {
-      runtime: lambda.Runtime.PYTHON_3_12,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset('lambda/updateAttributes/'),
-      timeout: cdk.Duration.seconds(30),
-      role: postConfirmationLambdaRole,
-      environment: {
-        USER_POOL_ID: userPool.userPoolId, // used in index.py
-      },
-    });
-
     const checkUploadQuotaLambdaRole = new iam.Role(this, 'CheckUploadQuotaLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
     });
@@ -592,9 +601,9 @@ def handler(event, context):
       console.log('ℹ️  No IP restrictions on API Gateway (requires authentication only)');
     }
 
-    const updateAttributesApi = new apigateway.RestApi(this, 'UpdateAttributesApi', {
-      restApiName: 'UpdateAttributesApi',
-      description: 'API to update Cognito user attributes (org, first_sign_in,country, state, city, total_file_uploaded).',
+    const api = new apigateway.RestApi(this, 'UpdateAttributesApi', {
+      restApiName: 'PdfUiApi',
+      description: 'API for PDF Accessibility UI operations.',
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
@@ -602,20 +611,11 @@ def handler(event, context):
       ...(apiGatewayPolicy ? { policy: apiGatewayPolicy } : {}),
     });
 
-    // 3) Create a Cognito Authorizer (User Pool Authorizer) referencing our user pool
     const userPoolAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'UserPoolAuthorizer', {
-      cognitoUserPools: [userPool], // array of user pools
+      cognitoUserPools: [userPool],
     });
 
-    // 4) Add Resource & Method
-    const UpdateFirstSignIn = updateAttributesApi.root.addResource('update-first-sign-in');
-    const quotaResource = updateAttributesApi.root.addResource('upload-quota');
-    // We attach the Cognito authorizer and set the authorizationType to COGNITO
-    UpdateFirstSignIn.addMethod('POST', new apigateway.LambdaIntegration(updateAttributesFn), {
-      authorizer: userPoolAuthorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO,
-    });
-
+    const quotaResource = api.root.addResource('upload-quota');
     quotaResource.addMethod('POST', new apigateway.LambdaIntegration(checkOrIncrementQuotaFn), {
       authorizer: userPoolAuthorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO,
@@ -646,8 +646,7 @@ def handler(event, context):
     mainBranch.addEnvironment('REACT_APP_HOSTED_UI_URL', appUrl);
     mainBranch.addEnvironment('REACT_APP_DOMAIN_PREFIX', domainPrefix);
 
-    mainBranch.addEnvironment('REACT_APP_UPDATE_FIRST_SIGN_IN', updateAttributesApi.urlForPath('/update-first-sign-in'));
-    mainBranch.addEnvironment('REACT_APP_UPLOAD_QUOTA_API', updateAttributesApi.urlForPath('/upload-quota'));
+    mainBranch.addEnvironment('REACT_APP_UPLOAD_QUOTA_API', api.urlForPath('/upload-quota'));
 
 
      // ------------------- Integration of UpdateAttributesGroups Lambda -------------------
@@ -732,13 +731,8 @@ def handler(event, context):
       value: appUrl,
       description: 'Amplify Application URL',
     });
-    new cdk.CfnOutput(this, 'UpdateFirstSignInEndpoint', {
-      value: updateAttributesApi.urlForPath('/update-first-sign-in'),
-      description: 'POST requests to this URL to update attributes.',
-    });
-
     new cdk.CfnOutput(this, 'CheckUploadQuotaEndpoint', {
-      value: updateAttributesApi.urlForPath('/upload-quota'),
+      value: api.urlForPath('/upload-quota'),
     });
 
 
