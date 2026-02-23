@@ -19,8 +19,9 @@ def handler(event, context):
 
     print(f'Email validation passed for: {user_email}')
 
-    # Auto-confirm the user (optional - remove if you want email verification)
-    event['response']['autoConfirmUser'] = True
-    event['response']['autoVerifyEmail'] = True
+    # Do NOT auto-confirm or auto-verify.
+    # Cognito will send a verification code to the user's email.
+    # After verification, the postConfirmation trigger will fire,
+    # assign groups, and disable the user pending admin approval.
 
     return event
