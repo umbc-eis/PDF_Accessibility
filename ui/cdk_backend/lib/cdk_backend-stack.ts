@@ -569,19 +569,11 @@ def handler(event, context):
     // =====================================================================
     // API Gateway with Optional IP Restriction
     // =====================================================================
-    const apiGatewayConfig: apigateway.RestApiProps = {
-      restApiName: 'UpdateAttributesApi',
-      description: 'API to update Cognito user attributes (org, first_sign_in,country, state, city, total_file_uploaded).',
-      defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
-        allowMethods: apigateway.Cors.ALL_METHODS,
-      },
-    };
-
-    // Add IP restriction policy if IP ranges are configured
+    // Build optional IP restriction policy
+    let apiGatewayPolicy: iam.PolicyDocument | undefined;
     if (ipRestrictionsEnabled) {
       console.log('🔒 Applying IP restrictions to API Gateway');
-      apiGatewayConfig.policy = new iam.PolicyDocument({
+      apiGatewayPolicy = new iam.PolicyDocument({
         statements: [
           new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
@@ -600,7 +592,15 @@ def handler(event, context):
       console.log('ℹ️  No IP restrictions on API Gateway (requires authentication only)');
     }
 
-    const updateAttributesApi = new apigateway.RestApi(this, 'UpdateAttributesApi', apiGatewayConfig);
+    const updateAttributesApi = new apigateway.RestApi(this, 'UpdateAttributesApi', {
+      restApiName: 'UpdateAttributesApi',
+      description: 'API to update Cognito user attributes (org, first_sign_in,country, state, city, total_file_uploaded).',
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+      },
+      ...(apiGatewayPolicy ? { policy: apiGatewayPolicy } : {}),
+    });
 
     // 3) Create a Cognito Authorizer (User Pool Authorizer) referencing our user pool
     const userPoolAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'UserPoolAuthorizer', {
