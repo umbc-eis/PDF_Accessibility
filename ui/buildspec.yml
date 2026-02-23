@@ -14,6 +14,7 @@ phases:
 
   pre_build:
     commands:
+      - cd ui/cdk_backend
       - echo "Building TypeScript sources"
       - npm run build
       - echo "Bootstrapping CDK (no approval)..."
@@ -24,6 +25,7 @@ phases:
 
   build:
     commands:
+      - cd ui/cdk_backend
       - echo "Deploying all CDK stacks..."
       - >-
         cdk deploy --all --require-approval never \

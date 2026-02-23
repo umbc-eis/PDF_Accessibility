@@ -201,7 +201,9 @@ else
                 "iam:DeletePolicy",
                 "iam:GetPolicy",
                 "iam:GetPolicyVersion",
-                "iam:ListPolicyVersions"
+                "iam:ListPolicyVersions",
+                "iam:CreatePolicyVersion",
+                "iam:DeletePolicyVersion"
             ],
             "Resource": [
                 "arn:aws:iam::'"$AWS_ACCOUNT_ID"':role/pdf-ui-*",
@@ -247,7 +249,9 @@ else
             ],
             "Resource": [
                 "arn:aws:s3:::cdk-*",
-                "arn:aws:s3:::cdk-*/*"
+                "arn:aws:s3:::cdk-*/*",
+                "arn:aws:s3:::cdkbackendstack-*",
+                "arn:aws:s3:::cdkbackendstack-*/*"
             ]
         },
         {
@@ -347,6 +351,34 @@ else
                 "arn:aws:logs:'"$AWS_REGION"':'"$AWS_ACCOUNT_ID"':log-group:*",
                 "arn:aws:logs:'"$AWS_REGION"':'"$AWS_ACCOUNT_ID"':log-group:*:*"
             ]
+        },
+        {
+            "Sid": "ECRBootstrap",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:GetAuthorizationToken"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ECRCDKRepo",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:CreateRepository",
+                "ecr:DescribeRepositories",
+                "ecr:PutLifecyclePolicy",
+                "ecr:SetRepositoryPolicy",
+                "ecr:GetRepositoryPolicy",
+                "ecr:ListTagsForResource",
+                "ecr:TagResource",
+                "ecr:PutImage",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:CompleteLayerUpload",
+                "ecr:InitiateLayerUpload",
+                "ecr:UploadLayerPart",
+                "ecr:BatchGetImage"
+            ],
+            "Resource": "arn:aws:ecr:'"$AWS_REGION"':'"$AWS_ACCOUNT_ID"':repository/cdk-*"
         },
         {
             "Sid": "STSAccess",

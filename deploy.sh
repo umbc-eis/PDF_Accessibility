@@ -581,7 +581,7 @@ EOF
         # Method 1: Try CloudFormation stack outputs
         PDF2PDF_BUCKET=$(aws cloudformation describe-stacks \
             --stack-name "PDFAccessibility" \
-            --query 'Stacks[0].Outputs[?OutputKey==`S3BucketName`].OutputValue' \
+            --query 'Stacks[0].Outputs[?OutputKey==`S3BucketName`].OutputValue | [0]' \
             --output text 2>/dev/null)
         
         # Method 2: Try alternative output key names
