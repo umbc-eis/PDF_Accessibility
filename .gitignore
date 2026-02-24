@@ -22,6 +22,7 @@ lambda/add_title/venv
 
 # IDE and editor files
 **/.vscode/
+.claude/
 
 # OS generated files
 **/.DS_Store
