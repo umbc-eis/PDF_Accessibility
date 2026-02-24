@@ -21,7 +21,9 @@ phases:
       - >-
         cdk bootstrap --require-approval never \
           -c PDF_TO_PDF_BUCKET=$PDF_TO_PDF_BUCKET \
-          -c PDF_TO_HTML_BUCKET=$PDF_TO_HTML_BUCKET
+          -c PDF_TO_HTML_BUCKET=$PDF_TO_HTML_BUCKET \
+          -c COGNITO_DOMAIN_PREFIX=${COGNITO_DOMAIN_PREFIX:-pdf-ui-authkqqjyt} \
+          ${CUSTOM_DOMAIN:+-c CUSTOM_DOMAIN=$CUSTOM_DOMAIN}
 
   build:
     commands:
@@ -30,7 +32,9 @@ phases:
       - >-
         cdk deploy --all --require-approval never \
           -c PDF_TO_PDF_BUCKET=$PDF_TO_PDF_BUCKET \
-          -c PDF_TO_HTML_BUCKET=$PDF_TO_HTML_BUCKET
+          -c PDF_TO_HTML_BUCKET=$PDF_TO_HTML_BUCKET \
+          -c COGNITO_DOMAIN_PREFIX=${COGNITO_DOMAIN_PREFIX:-pdf-ui-authkqqjyt} \
+          ${CUSTOM_DOMAIN:+-c CUSTOM_DOMAIN=$CUSTOM_DOMAIN}
 
   post_build:
     commands:

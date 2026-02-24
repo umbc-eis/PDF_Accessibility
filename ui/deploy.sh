@@ -47,6 +47,14 @@ if ([ -z "${PDF_TO_PDF_BUCKET:-}" ] || [ "${PDF_TO_PDF_BUCKET}" = "Null" ]) && (
   exit 1
 fi
 
+# Prompt for custom domain (optional)
+echo ""
+read -rp "Enter custom domain (without https://, leave empty for default Amplify domain): " CUSTOM_DOMAIN
+if [ -n "${CUSTOM_DOMAIN}" ]; then
+  echo "   Will configure for custom domain: https://${CUSTOM_DOMAIN}"
+  echo "   Also configuring: https://www.${CUSTOM_DOMAIN}"
+fi
+
 # --------------------------------------------------
 # 2. Ensure IAM service role exists
 # --------------------------------------------------
@@ -460,6 +468,18 @@ if [ -n "${PDF_TO_HTML_BUCKET:-}" ] && [ "${PDF_TO_HTML_BUCKET}" != "Null" ]; th
   ENV_VARS_ARRAY="$ENV_VARS_ARRAY"'{
       "name":  "PDF_TO_HTML_BUCKET",
       "value": "'"$PDF_TO_HTML_BUCKET"'",
+      "type":  "PLAINTEXT"
+    }'
+fi
+
+# Add CUSTOM_DOMAIN if provided
+if [ -n "${CUSTOM_DOMAIN:-}" ]; then
+  if [ -n "$ENV_VARS_ARRAY" ]; then
+    ENV_VARS_ARRAY="$ENV_VARS_ARRAY,"
+  fi
+  ENV_VARS_ARRAY="$ENV_VARS_ARRAY"'{
+      "name":  "CUSTOM_DOMAIN",
+      "value": "'"$CUSTOM_DOMAIN"'",
       "type":  "PLAINTEXT"
     }'
 fi

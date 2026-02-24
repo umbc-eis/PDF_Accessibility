@@ -132,10 +132,32 @@ export class CdkBackendStack extends cdk.Stack {
       status: amplify.RedirectStatus.REWRITE
     }));
 
-    const domainPrefix = `pdf-ui-auth${Math.random().toString(36).substring(2, 8)}`; // must be globally unique in that region
+    // Use fixed domain prefix from context or default to a stable value
+    // DO NOT use random values as they cause CloudFormation replacements on every deploy
+    const domainPrefix = this.node.tryGetContext('COGNITO_DOMAIN_PREFIX') || 'pdf-ui-auth-stable';
     const Default_Group = 'DefaultUsers';
     const Admin_Group = 'AdminUsers';
-    const appUrl = `https://main.${amplifyApp.appId}.amplifyapp.com`;
+
+    // Support custom domain via context parameter (without https://)
+    const customDomainInput = this.node.tryGetContext('CUSTOM_DOMAIN');
+    const amplifyDefaultUrl = `https://main.${amplifyApp.appId}.amplifyapp.com`;
+
+    // Generate list of allowed URLs (default Amplify + custom domains if provided)
+    const allowedUrls: string[] = [amplifyDefaultUrl];
+    if (customDomainInput) {
+      // Remove https:// if present and clean up the domain
+      const cleanDomain = customDomainInput.replace(/^https?:\/\//, '');
+      allowedUrls.push(`https://${cleanDomain}`);
+      // Also add www version if not already a www domain
+      if (!cleanDomain.startsWith('www.')) {
+        allowedUrls.push(`https://www.${cleanDomain}`);
+      }
+    }
+
+    // Primary app URL (use custom domain if provided, otherwise default Amplify)
+    const appUrl = customDomainInput
+      ? `https://${customDomainInput.replace(/^https?:\/\//, '')}`
+      : amplifyDefaultUrl;
 
     // --------- Set CORS on imported S3 buckets via custom resource ----------
     const corsConfiguration = {
@@ -143,7 +165,7 @@ export class CdkBackendStack extends cdk.Stack {
         {
           AllowedHeaders: ['*'],
           AllowedMethods: ['GET', 'PUT', 'POST', 'HEAD'],
-          AllowedOrigins: [appUrl, 'http://localhost:3000'],
+          AllowedOrigins: [...allowedUrls, 'http://localhost:3000'],
           ExposeHeaders: ['ETag'],
           MaxAgeSeconds: 3600,
         },
@@ -462,8 +484,14 @@ def handler(event, context):
           cognito.OAuthScope.PHONE,
           cognito.OAuthScope.PROFILE
         ],
-        callbackUrls: [`${appUrl}/callback`,"http://localhost:3000/callback"],
-        logoutUrls: [`${appUrl}/home`, "http://localhost:3000/home"],
+        callbackUrls: [
+          ...allowedUrls.map(url => `${url}/callback`),
+          "http://localhost:3000/callback"
+        ],
+        logoutUrls: [
+          ...allowedUrls.map(url => `${url}/home`),
+          "http://localhost:3000/home"
+        ],
       },
       generateSecret: false,
       preventUserExistenceErrors: true,
@@ -733,6 +761,11 @@ def handler(event, context):
     });
     new cdk.CfnOutput(this, 'CheckUploadQuotaEndpoint', {
       value: api.urlForPath('/upload-quota'),
+    });
+
+    new cdk.CfnOutput(this, 'ConfiguredDomains', {
+      value: allowedUrls.join(', '),
+      description: 'Domains configured for authentication and CORS',
     });
 
 
