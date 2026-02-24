@@ -27,9 +27,9 @@ When the [PDF Accessibility UI](https://github.com/umbc-eis/PDF_Accessibility) i
 
 | Attribute | Description | Default (DefaultUsers) |
 |---|---|---|
-| `custom:max_files_allowed` | Maximum number of files a user can upload | `25` |
-| `custom:max_pages_allowed` | Maximum number of pages per PDF | `25` |
-| `custom:max_size_allowed_MB` | Maximum file size in MB | `25` |
+| `custom:max_files_allowed` | Maximum number of files a user can upload | `1000` |
+| `custom:max_pages_allowed` | Maximum number of pages per PDF | `100` |
+| `custom:max_size_allowed_MB` | Maximum file size in MB | `50` |
 | `custom:total_files_uploaded` | Current upload count (tracked automatically) | `0` |
 
 ### Default Limits by User Group
@@ -42,7 +42,7 @@ The UI creates two Cognito user groups, each with different default limits:
 | `max_pages_allowed` | 25 | 2500 |
 | `max_size_allowed_MB` | 25 | 1000 |
 
-These defaults are set when a user first signs up and is automatically assigned to a group. Only users with `@umbc.edu` email addresses can register. Specific admin users (`champ@umbc.edu` and `paluck@umbc.edu`) are automatically assigned to **AdminUsers**; all others go to **DefaultUsers**.
+These defaults are set when a user first signs up and is automatically assigned to a group. Only users with `@umbc.edu` email addresses can register. Specific admin users (`champ@umbc.edu` and `[removed]`) are automatically assigned to **AdminUsers**; all others go to **DefaultUsers**.
 
 ---
 
@@ -51,7 +51,7 @@ These defaults are set when a user first signs up and is automatically assigned 
 To change limits for a **specific user** without redeploying:
 
 1. Open the [Amazon Cognito Console](https://console.aws.amazon.com/cognito/).
-2. Select the user pool named **`PDF-Accessability-User-Pool`**.
+2. Select the user pool named **`PDF-Accessibility-User-Pool`**.
 3. Navigate to **Users** and search for the user by email or username.
 4. Select the user and scroll to **User attributes**.
 5. Click **Edit** and modify any of the following attributes:

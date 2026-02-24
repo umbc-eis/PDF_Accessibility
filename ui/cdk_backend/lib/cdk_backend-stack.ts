@@ -266,9 +266,6 @@ export class CdkBackendStack extends cdk.Stack {
     });
 
     signupNotificationTopic.addSubscription(
-      new snsSubscriptions.EmailSubscription('paluck@umbc.edu')
-    );
-    signupNotificationTopic.addSubscription(
       new snsSubscriptions.EmailSubscription('champ@umbc.edu')
     );
 
@@ -385,8 +382,8 @@ def handler(event, context):
       userPoolTriggers.preAuthentication = preAuthFn;
     }
 
-    const userPool = new cognito.UserPool(this, 'PDF-Accessability-User-Pool', {
-      userPoolName: 'PDF-Accessability-User-Pool',
+    const userPool = new cognito.UserPool(this, 'PDF-Accessibility-User-Pool', {
+      userPoolName: 'PDF-Accessibility-User-Pool',
       selfSignUpEnabled: true,
       signInAliases: { email: true },
 
@@ -460,14 +457,14 @@ def handler(event, context):
       });
 
     // Domain prefix is defined above with appUrl
-    const userPoolDomain = new cognito.CfnUserPoolDomain(this, 'PDF-Accessability-User-Pool-Domain', {
+    const userPoolDomain = new cognito.CfnUserPoolDomain(this, 'PDF-Accessibility-User-Pool-Domain', {
       domain: domainPrefix,
       userPoolId: userPool.userPoolId,
       managedLoginVersion: 2,
     });
 
-    const userPoolClient = userPool.addClient('PDF-Accessability-User-Pool-Client', {
-      userPoolClientName: 'PDF-Accessability-User-Pool-Client',
+    const userPoolClient = userPool.addClient('PDF-Accessibility-User-Pool-Client', {
+      userPoolClientName: 'PDF-Accessibility-User-Pool-Client',
       authFlows: {
         userSrp: true,
         userPassword: true,

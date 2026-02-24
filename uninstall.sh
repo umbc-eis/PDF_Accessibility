@@ -136,9 +136,17 @@ if [ -n "$UI_STACKS" ]; then
 fi
 
 # Check for CodeBuild projects (both backend and UI)
+# Note: Current deploy script uses fixed name 'pdf-ui-deployment'
 CODEBUILD_PROJECTS=$(aws codebuild list-projects \
     --query 'projects[?contains(@, `pdfremediation`) || contains(@, `pdf-ui`)]' \
     --output text 2>/dev/null)
+
+# Also check for the standard deployment project
+if aws codebuild batch-get-projects --names "pdf-ui-deployment-backend" --query 'projects[0].name' --output text 2>/dev/null | grep -q "pdf-ui-deployment-backend"; then
+    if [[ ! " ${CODEBUILD_PROJECTS[@]} " =~ " pdf-ui-deployment-backend " ]]; then
+        CODEBUILD_PROJECTS="$CODEBUILD_PROJECTS pdf-ui-deployment-backend"
+    fi
+fi
 
 if [ -n "$CODEBUILD_PROJECTS" ]; then
     for project in $CODEBUILD_PROJECTS; do
@@ -300,6 +308,14 @@ delete_bucket() {
         print_status "   Versions removed"
     fi
 
+    # Try to remove bucket policy (may prevent deletion)
+    print_status "   Removing bucket policy..."
+    aws s3api delete-bucket-policy --bucket "$bucket_name" 2>/dev/null || true
+
+    # Try to disable versioning
+    print_status "   Disabling versioning..."
+    aws s3api put-bucket-versioning --bucket "$bucket_name" --versioning-configuration Status=Suspended 2>/dev/null || true
+
     # Delete bucket
     if aws s3 rb "s3://$bucket_name" 2>/dev/null; then
         print_success "   ✅ Bucket deleted: $bucket_name"
@@ -309,7 +325,8 @@ delete_bucket() {
             print_success "   ✅ Bucket already deleted by CloudFormation: $bucket_name"
         else
             print_warning "   ⚠️ Could not delete bucket: $bucket_name"
-            print_status "   You may need to delete it manually from the AWS Console"
+            print_status "   This may be a CDK-managed bucket with retention policy"
+            print_status "   Try deleting manually: aws s3 rb s3://$bucket_name --force"
         fi
     fi
 }
@@ -468,10 +485,11 @@ else
 fi
 echo ""
 
-# Step 4: Delete ECR repositories
+# Step 4: Delete ECR repositories (including CDK bootstrap repos)
 print_header "🔧 Step 4/7: Deleting ECR repositories..."
 echo ""
 
+# Delete application ECR repositories
 ECR_REPOS=("pdf2html-lambda")
 for repo in "${ECR_REPOS[@]}"; do
     if aws ecr describe-repositories --repository-names "$repo" --region $REGION --output text >/dev/null 2>&1; then
@@ -483,6 +501,35 @@ for repo in "${ECR_REPOS[@]}"; do
         fi
     fi
 done
+
+# Find and clean CDK bootstrap ECR repositories
+print_status "Searching for CDK bootstrap ECR repositories..."
+CDK_ECR_REPOS=$(aws ecr describe-repositories --region $REGION --query 'repositories[?contains(repositoryName, `cdk-`)].repositoryName' --output text 2>/dev/null || echo "")
+
+if [ -n "$CDK_ECR_REPOS" ]; then
+    for repo in $CDK_ECR_REPOS; do
+        print_status "Cleaning CDK ECR repository: $repo"
+
+        # List and delete all images
+        IMAGE_IDS=$(aws ecr list-images --repository-name "$repo" --region $REGION --query 'imageIds[*]' --output json 2>/dev/null)
+
+        if [ "$IMAGE_IDS" != "[]" ] && [ -n "$IMAGE_IDS" ]; then
+            print_status "   Deleting images from $repo..."
+            if aws ecr batch-delete-image --repository-name "$repo" --region $REGION --image-ids "$IMAGE_IDS" --output text >/dev/null 2>&1; then
+                print_status "   Images deleted from $repo"
+            fi
+        fi
+
+        # Now delete the repository
+        if aws ecr delete-repository --repository-name "$repo" --force --region $REGION --output text >/dev/null 2>&1; then
+            print_success "   ✅ CDK Repository deleted: $repo"
+        else
+            print_warning "   ⚠️ Could not delete CDK repository: $repo"
+        fi
+    done
+else
+    print_status "No CDK ECR repositories found."
+fi
 echo ""
 
 # Step 5: Delete Secrets Manager secrets
@@ -516,8 +563,65 @@ else
 fi
 echo ""
 
-# Step 7: Delete CloudWatch dashboards
-print_header "🔧 Step 7/7: Deleting CloudWatch dashboards..."
+# Step 7: Delete Cognito User Pool (with confirmation)
+print_header "🔧 Step 7/8: Checking for Cognito User Pools..."
+echo ""
+
+COGNITO_POOLS=$(aws cognito-idp list-user-pools --max-results 60 --region $REGION \
+    --query 'UserPools[?contains(Name, `PDF-Accessibility-User-Pool`)].{Name:Name,Id:Id}' \
+    --output json 2>/dev/null)
+
+if [ -n "$COGNITO_POOLS" ] && [ "$COGNITO_POOLS" != "[]" ]; then
+    print_warning "⚠️  Found Cognito User Pool(s) - contains user accounts and authentication data!"
+    echo "$COGNITO_POOLS" | jq -r '.[] | "   • \(.Name) (ID: \(.Id))"' 2>/dev/null
+    echo ""
+
+    print_danger "⚠️  Deleting the User Pool will:"
+    print_status "   • Remove ALL user accounts permanently"
+    print_status "   • Delete authentication configuration"
+    print_status "   • Break authentication for any running apps"
+    echo ""
+
+    read -p "$(echo -e ${YELLOW}Delete Cognito User Pool\(s\)? \(y/N\):${NC} )" DELETE_COGNITO
+
+    if [[ "$DELETE_COGNITO" =~ ^[Yy]$ ]]; then
+        echo "$COGNITO_POOLS" | jq -r '.[].Id' 2>/dev/null | while read pool_id; do
+            if [ -n "$pool_id" ]; then
+                POOL_NAME=$(aws cognito-idp describe-user-pool --user-pool-id "$pool_id" --region $REGION \
+                    --query 'UserPool.Name' --output text 2>/dev/null)
+
+                print_status "Deleting User Pool: $POOL_NAME"
+
+                # Delete User Pool Domain first (required)
+                DOMAIN=$(aws cognito-idp describe-user-pool --user-pool-id "$pool_id" --region $REGION \
+                    --query 'UserPool.Domain' --output text 2>/dev/null)
+
+                if [ -n "$DOMAIN" ] && [ "$DOMAIN" != "None" ]; then
+                    print_status "   Deleting domain: $DOMAIN"
+                    aws cognito-idp delete-user-pool-domain --domain "$DOMAIN" --user-pool-id "$pool_id" --region $REGION 2>/dev/null || true
+                    sleep 2
+                fi
+
+                # Delete the User Pool
+                if aws cognito-idp delete-user-pool --user-pool-id "$pool_id" --region $REGION 2>/dev/null; then
+                    print_success "   ✅ User Pool deleted: $POOL_NAME"
+                else
+                    print_warning "   ⚠️ Could not delete User Pool: $POOL_NAME"
+                    print_status "   It may have been deleted by CloudFormation already"
+                fi
+            fi
+        done
+    else
+        print_status "Keeping Cognito User Pool(s)."
+        print_warning "   Note: CloudFormation may fail to delete if User Pool exists"
+    fi
+else
+    print_status "No Cognito User Pools found."
+fi
+echo ""
+
+# Step 8: Delete CloudWatch dashboards
+print_header "🔧 Step 8/8: Deleting CloudWatch dashboards..."
 echo ""
 
 DASHBOARDS=$(aws cloudwatch list-dashboards \
@@ -558,10 +662,40 @@ if [ ${#FOUND_PROJECTS[@]} -gt 0 ]; then
 fi
 
 echo ""
-print_warning "⚠️  Note: CDK Bootstrap stack (CDKToolkit) was not deleted."
-print_status "   This stack may be used by other CDK projects."
-print_status "   To delete it manually if needed:"
-print_status "   aws cloudformation delete-stack --stack-name CDKToolkit"
+
+# Ask if user wants to delete CDK bootstrap stack
+print_warning "⚠️  CDK Bootstrap stack (CDKToolkit) contains shared resources."
+print_status "   This stack may be used by other CDK projects in this account/region."
+echo ""
+
+read -p "$(echo -e ${YELLOW}Do you want to delete the CDK Bootstrap stack? \(y/N\):${NC} )" DELETE_CDK
+
+if [[ "$DELETE_CDK" =~ ^[Yy]$ ]]; then
+    print_status "Deleting CDK Bootstrap stack..."
+
+    # Delete CDK S3 staging buckets first
+    CDK_BUCKETS=$(aws s3api list-buckets --query 'Buckets[?contains(Name, `cdk-`)].Name' --output text 2>/dev/null)
+
+    if [ -n "$CDK_BUCKETS" ]; then
+        for bucket in $CDK_BUCKETS; do
+            print_status "   Emptying CDK bucket: $bucket"
+            aws s3 rm "s3://$bucket" --recursive --quiet 2>/dev/null || true
+        done
+    fi
+
+    # Delete the CDKToolkit stack
+    if aws cloudformation delete-stack --stack-name CDKToolkit --region $REGION 2>/dev/null; then
+        print_status "   Waiting for CDK Bootstrap stack deletion..."
+        aws cloudformation wait stack-delete-complete --stack-name CDKToolkit --region $REGION 2>/dev/null || true
+        print_success "   ✅ CDK Bootstrap stack deleted"
+    else
+        print_warning "   ⚠️ Could not delete CDK Bootstrap stack"
+    fi
+else
+    print_status "Keeping CDK Bootstrap stack (CDKToolkit)."
+    print_status "   To delete it manually later:"
+    print_status "   aws cloudformation delete-stack --stack-name CDKToolkit"
+fi
 echo ""
 
 print_success "Thank you for using PDF Accessibility Solutions!"

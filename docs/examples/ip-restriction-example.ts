@@ -196,7 +196,7 @@ preAuthIpCheckLambda.addToRolePolicy(
 
 // ⚠️ Add to your existing Cognito User Pool
 // MODIFY your existing userPool creation to include the trigger:
-const userPool = new cognito.UserPool(this, 'PDF-Accessability-User-Pool', {
+const userPool = new cognito.UserPool(this, 'PDF-Accessibility-User-Pool', {
   // ... existing config ...
   lambdaTriggers: {
     preAuthentication: preAuthIpCheckLambda,  // ✅ ADD THIS

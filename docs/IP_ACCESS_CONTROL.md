@@ -357,7 +357,7 @@ def is_ip_in_range(ip, cidr):
 });
 
 // Add to Cognito User Pool
-const userPool = new cognito.UserPool(this, 'PDF-Accessability-User-Pool', {
+const userPool = new cognito.UserPool(this, 'PDF-Accessibility-User-Pool', {
   // ... existing config
   lambdaTriggers: {
     preAuthentication: preAuthLambda,

@@ -2,7 +2,7 @@ import json
 import os
 import boto3
 
-ADMIN_EMAILS = ['champ@umbc.edu', 'paluck@umbc.edu']
+ADMIN_EMAILS = ['champ@umbc.edu']
 
 def handler(event, context):
     print('Post Confirmation Trigger Event:', json.dumps(event, indent=2))
@@ -19,15 +19,15 @@ def handler(event, context):
     group_attributes = {
         DEFAULT_GROUP: {
             'custom:total_files_uploaded': '0',
-            'custom:max_files_allowed': '25',
-            'custom:max_pages_allowed': '25',
-            'custom:max_size_allowed_MB': '25'
+            'custom:max_files_allowed': '1000',
+            'custom:max_pages_allowed': '100',
+            'custom:max_size_allowed_MB': '50'
         },
         ADMIN_GROUP: {
             'custom:total_files_uploaded': '0',
-            'custom:max_files_allowed': '100',
-            'custom:max_pages_allowed': '2500',
-            'custom:max_size_allowed_MB': '1000'
+            'custom:max_files_allowed': '1000',
+            'custom:max_pages_allowed': '100',
+            'custom:max_size_allowed_MB': '50'
         }
     }
 

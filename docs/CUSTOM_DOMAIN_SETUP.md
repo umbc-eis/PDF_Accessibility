@@ -219,7 +219,7 @@ aws amplify get-domain-association \
 ```bash
 # Get User Pool ID
 USER_POOL_ID=$(aws cognito-idp list-user-pools --max-results 10 \
-  --query 'UserPools[?Name==`PDF-Accessability-User-Pool`].Id' \
+  --query 'UserPools[?Name==`PDF-Accessibility-User-Pool`].Id' \
   --output text)
 
 # Get App Client ID
@@ -277,7 +277,7 @@ const appUrl = 'https://pdf.yourdomain.com';  // ⚠️ Replace with your domain
 
 ```typescript
 // Update the Cognito callback URLs (around line 330)
-const userPoolClient = userPool.addClient('PDF-Accessability-User-Pool-Client', {
+const userPoolClient = userPool.addClient('PDF-Accessibility-User-Pool-Client', {
   // ... existing config ...
   oAuth: {
     callbackUrls: [
