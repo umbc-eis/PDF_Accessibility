@@ -14,58 +14,9 @@ import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as cloudtrail from 'aws-cdk-lib/aws-cloudtrail';
 import * as cr from 'aws-cdk-lib/custom-resources';
-import * as fs from 'fs';
-import * as path from 'path';
-
 export class CdkBackendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-
-    // =====================================================================
-    // IP Restriction Configuration
-    // =====================================================================
-    // Read allowed IP ranges from file (if exists)
-    // If file doesn't exist or is empty, no IP restrictions are applied
-    const allowedIpsFile = path.join(__dirname, '..', 'allowed-ips.txt');
-    let allowedIpRanges: string[] = [];
-
-    try {
-      if (fs.existsSync(allowedIpsFile)) {
-        const fileContent = fs.readFileSync(allowedIpsFile, 'utf-8');
-        allowedIpRanges = fileContent
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => line && !line.startsWith('#')) // Remove comments and empty lines
-          .filter(line => {
-            // Basic CIDR validation
-            const cidrRegex = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
-            if (!cidrRegex.test(line)) {
-              console.warn(`⚠️  Invalid CIDR format, skipping: ${line}`);
-              return false;
-            }
-            return true;
-          });
-
-        if (allowedIpRanges.length > 0) {
-          console.log('🔒 IP Restrictions ENABLED');
-          console.log(`   Allowed CIDR ranges (${allowedIpRanges.length}):`);
-          allowedIpRanges.forEach(ip => console.log(`   - ${ip}`));
-        } else {
-          console.log('⚠️  allowed-ips.txt exists but contains no valid entries');
-          console.log('   IP restrictions will NOT be applied');
-        }
-      } else {
-        console.log('ℹ️  No allowed-ips.txt file found');
-        console.log('   IP restrictions will NOT be applied (public access with auth)');
-      }
-    } catch (error) {
-      console.warn('⚠️  Error reading allowed-ips.txt:', error);
-      console.log('   IP restrictions will NOT be applied');
-      allowedIpRanges = [];
-    }
-
-    const ipRestrictionsEnabled = allowedIpRanges.length > 0;
-    // =====================================================================
 
     const PDF_TO_PDF_BUCKET = this.node.tryGetContext('PDF_TO_PDF_BUCKET') || "Null";
     const PDF_TO_HTML_BUCKET = this.node.tryGetContext('PDF_TO_HTML_BUCKET') || "Null";
@@ -283,104 +234,11 @@ export class CdkBackendStack extends cdk.Stack {
       },
     });
 
-    // =====================================================================
-    // Pre-Authentication Lambda (IP Restriction Check)
-    // =====================================================================
-    let preAuthFn: lambda.Function | undefined;
-
-    if (ipRestrictionsEnabled) {
-      console.log('🔒 Creating Pre-Authentication Lambda for IP check at login');
-
-      // Create inline Lambda code with the allowed IP ranges
-      const preAuthCode = `
-import ipaddress
-import json
-
-# Allowed IP ranges (configured during deployment)
-ALLOWED_IP_RANGES = ${JSON.stringify(allowedIpRanges)}
-
-def handler(event, context):
-    """
-    Pre-Authentication Trigger: Check if user's IP is in allowed range
-    This runs BEFORE authentication completes, blocking unauthorized IPs at login
-    """
-    try:
-        # Get client IP from Cognito event
-        request_context = event.get('request', {})
-        user_context = request_context.get('userContextData', {})
-        source_ips = user_context.get('sourceIp', [])
-
-        if not source_ips:
-            print('WARNING: Unable to determine source IP address')
-            raise Exception('Unable to verify network access. Please contact your administrator.')
-
-        client_ip = source_ips[0]
-        user_email = event.get('request', {}).get('userAttributes', {}).get('email', 'unknown')
-
-        print(f'Login attempt - User: {user_email}, IP: {client_ip}')
-
-        # Check if IP is in allowed range
-        allowed = False
-        matched_range = None
-
-        for ip_range in ALLOWED_IP_RANGES:
-            try:
-                network = ipaddress.ip_network(ip_range, strict=False)
-                if ipaddress.ip_address(client_ip) in network:
-                    allowed = True
-                    matched_range = ip_range
-                    break
-            except ValueError as e:
-                print(f'ERROR: Invalid IP range {ip_range}: {e}')
-                continue
-
-        if allowed:
-            print(f'✅ Access ALLOWED - IP {client_ip} matched range {matched_range}')
-            return event
-        else:
-            print(f'❌ Access DENIED - IP {client_ip} not in allowed ranges')
-            raise Exception(
-                f'Access denied: Your IP address ({client_ip}) is not authorized to access this application. '
-                f'Please connect to your organization\\'s VPN or network and try again. '
-                f'If you believe this is an error, contact your administrator.'
-            )
-
-    except Exception as e:
-        error_msg = str(e)
-        print(f'Pre-authentication error: {error_msg}')
-        raise Exception(error_msg)
-`;
-
-      preAuthFn = new lambda.Function(this, 'PreAuthIpCheckLambda', {
-        runtime: lambda.Runtime.PYTHON_3_12,
-        handler: 'index.handler',
-        code: lambda.Code.fromInline(preAuthCode),
-        timeout: cdk.Duration.seconds(30),
-        description: 'Pre-authentication trigger to enforce IP-based access control',
-      });
-
-      // Grant CloudWatch Logs permissions
-      preAuthFn.addToRolePolicy(
-        new iam.PolicyStatement({
-          actions: ['logs:CreateLogGroup', 'logs:CreateLogStream', 'logs:PutLogEvents'],
-          resources: ['*'],
-        })
-      );
-    } else {
-      console.log('ℹ️  No Pre-Authentication Lambda (no IP restrictions configured)');
-    }
-    // =====================================================================
-
     // ------------------- Cognito: User Pool, Domain, Client -------------------
     const userPoolTriggers: any = {
       preSignUp: preSignUpFn,
       postConfirmation: postConfirmationFn,
     };
-
-    // Add preAuthentication trigger if IP restrictions are enabled
-    if (preAuthFn) {
-      userPoolTriggers.preAuthentication = preAuthFn;
-    }
 
     const userPool = new cognito.UserPool(this, 'PDF-Accessibility-User-Pool', {
       userPoolName: 'PDF-Accessibility-User-Pool',
@@ -600,32 +458,6 @@ def handler(event, context):
       roles: [checkUploadQuotaLambdaRole.roleName],
     });
 
-    // =====================================================================
-    // API Gateway with Optional IP Restriction
-    // =====================================================================
-    // Build optional IP restriction policy
-    let apiGatewayPolicy: iam.PolicyDocument | undefined;
-    if (ipRestrictionsEnabled) {
-      console.log('🔒 Applying IP restrictions to API Gateway');
-      apiGatewayPolicy = new iam.PolicyDocument({
-        statements: [
-          new iam.PolicyStatement({
-            effect: iam.Effect.ALLOW,
-            principals: [new iam.AnyPrincipal()],
-            actions: ['execute-api:Invoke'],
-            resources: ['execute-api:/*'],
-            conditions: {
-              IpAddress: {
-                'aws:SourceIp': allowedIpRanges,
-              },
-            },
-          }),
-        ],
-      });
-    } else {
-      console.log('ℹ️  No IP restrictions on API Gateway (requires authentication only)');
-    }
-
     const api = new apigateway.RestApi(this, 'UpdateAttributesApi', {
       restApiName: 'PdfUiApi',
       description: 'API for PDF Accessibility UI operations.',
@@ -633,7 +465,6 @@ def handler(event, context):
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
       },
-      ...(apiGatewayPolicy ? { policy: apiGatewayPolicy } : {}),
     });
 
     const userPoolAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'UserPoolAuthorizer', {

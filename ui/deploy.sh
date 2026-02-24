@@ -56,6 +56,38 @@ if [ -n "${CUSTOM_DOMAIN}" ]; then
 fi
 
 # --------------------------------------------------
+# WAF / Firewall Configuration
+# --------------------------------------------------
+echo ""
+echo "Firewall (WAF) Configuration:"
+echo "   The following Amplify-recommended protections are always applied:"
+echo "     - IP Reputation List  (blocks known malicious IPs)"
+echo "     - Common Rule Set     (OWASP Top 10 protection)"
+echo "     - Known Bad Inputs    (blocks common attack patterns)"
+echo ""
+
+WAF_ALLOWED_IPS=""
+WAF_ALLOWED_COUNTRIES=""
+
+read -rp "Restrict access to specific IP ranges only? (yes/no) [no]: " _WAF_IP_ANSWER
+if [[ "${_WAF_IP_ANSWER,,}" == "yes" || "${_WAF_IP_ANSWER,,}" == "y" ]]; then
+  read -rp "Enter allowed CIDR ranges (comma-separated, e.g. 130.85.0.0/16,10.0.0.0/8): " WAF_ALLOWED_IPS
+  echo "   IP allowlist set: ${WAF_ALLOWED_IPS}"
+else
+  read -rp "Restrict access to specific countries only? (yes/no) [no]: " _WAF_COUNTRY_ANSWER
+  if [[ "${_WAF_COUNTRY_ANSWER,,}" == "yes" || "${_WAF_COUNTRY_ANSWER,,}" == "y" ]]; then
+    echo ""
+    echo "   Look up ISO 3166-1 alpha-2 country codes at:"
+    echo "   https://www.iso.org/obp/ui/#search/code/"
+    echo ""
+    read -rp "Enter allowed country codes (comma-separated, e.g. US,CA,GB): " WAF_ALLOWED_COUNTRIES
+    echo "   Country allowlist set: ${WAF_ALLOWED_COUNTRIES}"
+  else
+    echo "   No additional restrictions — Amplify-recommended protection only."
+  fi
+fi
+
+# --------------------------------------------------
 # 2. Ensure IAM service role exists
 # --------------------------------------------------
 
@@ -427,6 +459,27 @@ else
                 "sns:ListSubscriptionsByTopic"
             ],
             "Resource": "arn:aws:sns:'"$AWS_REGION"':'"$AWS_ACCOUNT_ID"':pdf-ui-*"
+        },
+        {
+            "Sid": "WAFv2Access",
+            "Effect": "Allow",
+            "Action": [
+                "wafv2:CreateWebACL",
+                "wafv2:UpdateWebACL",
+                "wafv2:GetWebACL",
+                "wafv2:ListWebACLs",
+                "wafv2:DeleteWebACL",
+                "wafv2:CreateIPSet",
+                "wafv2:UpdateIPSet",
+                "wafv2:GetIPSet",
+                "wafv2:ListIPSets",
+                "wafv2:AssociateWebACL",
+                "wafv2:DisassociateWebACL",
+                "wafv2:GetWebACLForResource",
+                "wafv2:ListTagsForResource",
+                "wafv2:TagResource"
+            ],
+            "Resource": "*"
         }
     ]
 }'
@@ -493,6 +546,30 @@ if [ -n "${CUSTOM_DOMAIN:-}" ]; then
     }'
 fi
 
+
+# Add WAF_ALLOWED_IPS if provided
+if [ -n "${WAF_ALLOWED_IPS:-}" ]; then
+  if [ -n "$ENV_VARS_ARRAY" ]; then
+    ENV_VARS_ARRAY="$ENV_VARS_ARRAY,"
+  fi
+  ENV_VARS_ARRAY="$ENV_VARS_ARRAY"'{
+      "name":  "WAF_ALLOWED_IPS",
+      "value": "'"$WAF_ALLOWED_IPS"'",
+      "type":  "PLAINTEXT"
+    }'
+fi
+
+# Add WAF_ALLOWED_COUNTRIES if provided
+if [ -n "${WAF_ALLOWED_COUNTRIES:-}" ]; then
+  if [ -n "$ENV_VARS_ARRAY" ]; then
+    ENV_VARS_ARRAY="$ENV_VARS_ARRAY,"
+  fi
+  ENV_VARS_ARRAY="$ENV_VARS_ARRAY"'{
+      "name":  "WAF_ALLOWED_COUNTRIES",
+      "value": "'"$WAF_ALLOWED_COUNTRIES"'",
+      "type":  "PLAINTEXT"
+    }'
+fi
 BACKEND_ENVIRONMENT='{
   "type": "LINUX_CONTAINER",
   "image": "aws/codebuild/amazonlinux-x86_64-standard:5.0",

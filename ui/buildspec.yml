@@ -39,3 +39,5 @@ phases:
   post_build:
     commands:
       - echo "CDK deployment complete."
+      - echo "Configuring WAF..."
+      - python3 $CODEBUILD_SRC_DIR/ui/setup-waf.py
