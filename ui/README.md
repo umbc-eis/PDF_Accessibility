@@ -224,7 +224,7 @@ Your upload quota is displayed in the header:
 Administrators can change user groups through the AWS Cognito console:
 
 1. Navigate to Amazon Cognito in AWS Console
-2. Select the `PDF-Accessability-User-Pool`
+2. Select the `PDF-Accessibility-User-Pool`
 3. Go to "Users and groups"
 4. Select a user and add them to a group
 5. User quotas update automatically via EventBridge
